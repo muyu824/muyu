@@ -270,6 +270,7 @@
       max-width: 180px;
       border-radius: 12px;
       border: 1px solid var(--border);
+      cursor: zoom-in;
       display: block;
     }
 
@@ -819,6 +820,94 @@
     .swatch.active { border-color: #fff; transform: scale(1.15); }
     .swatch:active { transform: scale(.9); }
 
+    /* ── image lightbox ── */
+    #lightbox {
+      display: none; position: fixed; inset: 0; z-index: 600;
+      background: rgba(0,0,0,.92); align-items: center; justify-content: center;
+    }
+    #lightbox.show { display: flex; }
+    #lightbox img {
+      max-width: 95vw; max-height: 90vh;
+      border-radius: 12px; object-fit: contain;
+    }
+    #lightbox-close {
+      position: absolute; top: max(16px,env(safe-area-inset-top)); right: 18px;
+      background: rgba(255,255,255,.15); border: none; color: #fff;
+      font-size: 22px; width: 38px; height: 38px; border-radius: 50%;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+    }
+
+    /* ── scroll-to-bottom fab ── */
+    #scroll-btn {
+      display: none; position: fixed; bottom: 72px; right: 14px;
+      width: 36px; height: 36px; border-radius: 50%;
+      background: var(--purple); border: none; color: #fff;
+      font-size: 18px; cursor: pointer; z-index: 50;
+      box-shadow: 0 4px 14px rgba(123,47,255,.5);
+      align-items: center; justify-content: center;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #scroll-btn.show { display: flex; }
+
+    /* ── search overlay ── */
+    #search-overlay {
+      display: none; position: fixed; inset: 0; z-index: 300;
+      background: rgba(10,3,20,.97);
+      backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+      flex-direction: column;
+      padding: max(14px,env(safe-area-inset-top)) 0 0;
+    }
+    #search-overlay.show { display: flex; }
+    .search-bar {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 16px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    #search-inp {
+      flex: 1; background: rgba(255,255,255,.07);
+      border: 1px solid var(--border); border-radius: 22px;
+      padding: 10px 16px; color: var(--text); font-size: 15px;
+      font-family: inherit; outline: none;
+    }
+    #search-inp::placeholder { color: rgba(180,140,255,.35); }
+    .search-close {
+      background: none; border: none; color: var(--dim);
+      font-size: 15px; cursor: pointer; padding: 4px 6px; white-space: nowrap;
+    }
+    #search-results {
+      flex: 1; overflow-y: auto; padding: 10px 14px;
+    }
+    .sr-item {
+      background: rgba(255,255,255,.04); border: 1px solid var(--border);
+      border-radius: 14px; padding: 12px 14px; margin-bottom: 8px;
+    }
+    .sr-role { font-size: 10px; color: var(--dim); margin-bottom: 5px; }
+    .sr-text { font-size: 14px; line-height: 1.55; color: var(--text);
+      display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+      overflow: hidden; }
+    .sr-text mark { background: rgba(196,74,255,.35); color: var(--text);
+      border-radius: 3px; }
+    .sr-empty { color: var(--dim); font-size: 13px; text-align: center;
+      padding: 40px 0; }
+
+    /* ── nickname input in drawer ── */
+    .nick-row {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 16px 12px;
+    }
+    #nick-inp {
+      flex: 1; background: rgba(255,255,255,.06);
+      border: 1px solid var(--border); border-radius: 20px;
+      padding: 7px 14px; color: var(--text); font-size: 13px;
+      font-family: inherit; outline: none;
+    }
+    #nick-inp::placeholder { color: rgba(180,140,255,.3); }
+    #nick-save {
+      background: var(--purple); border: none; color: #fff;
+      border-radius: 18px; padding: 7px 14px; font-size: 13px;
+      cursor: pointer; flex-shrink: 0;
+    }
+
     /* ── bg particles ── */
     #bg {
       position: fixed; inset: 0;
@@ -856,6 +945,11 @@
     <div class="drawer-avatar">👻</div>
     <div class="drawer-name">男鬼</div>
     <div class="drawer-sub">你的专属幽灵伴侣</div>
+    <div class="drawer-section-title">你的称呼</div>
+    <div class="nick-row">
+      <input id="nick-inp" placeholder="muyu" maxlength="20">
+      <button id="nick-save" onclick="saveNickname()">保存</button>
+    </div>
 
     <div class="drawer-divider"></div>
     <div class="drawer-section-title">功能</div>
@@ -874,10 +968,19 @@
       <span class="drawer-icon">🗓️</span>
       <span class="drawer-label">倒计时</span>
     </div>
+    <div class="drawer-item" onclick="closeDrawer();openSearch()">
+      <span class="drawer-icon">🔍</span>
+      <span class="drawer-label">搜索对话</span>
+    </div>
     <div class="drawer-item" id="notif-item" onclick="toggleNotif()">
       <span class="drawer-icon">🔔</span>
       <span class="drawer-label">消息通知</span>
       <span class="drawer-badge show" id="notif-badge">未开启</span>
+    </div>
+    <div class="drawer-item" id="rain-item" onclick="toggleRain()">
+      <span class="drawer-icon">🌧️</span>
+      <span class="drawer-label" id="rain-label">雨声氛围</span>
+      <span class="drawer-badge" id="rain-badge">已开启</span>
     </div>
     <div class="drawer-item" onclick="closeDrawer();openMemories()">
       <span class="drawer-icon">🧠</span>
@@ -1010,6 +1113,24 @@
   </div>
 </div>
 
+<!-- image lightbox -->
+<div id="lightbox" onclick="closeLightbox()">
+  <button id="lightbox-close" onclick="closeLightbox()">✕</button>
+  <img id="lightbox-img" src="" alt="">
+</div>
+
+<!-- scroll-to-bottom -->
+<button id="scroll-btn" class="show" onclick="scrollToBottom()" style="display:none">↓</button>
+
+<!-- search overlay -->
+<div id="search-overlay">
+  <div class="search-bar">
+    <input id="search-inp" placeholder="搜索对话内容…" oninput="doSearch(this.value)">
+    <button class="search-close" onclick="closeSearch()">取消</button>
+  </div>
+  <div id="search-results"></div>
+</div>
+
 <!-- bubble long-press menu -->
 <div id="bm-mask" onclick="closeBubbleMenu()"></div>
 <div id="bubble-menu">
@@ -1102,7 +1223,7 @@ async function doSend() {
     wrapU.className = 'row user'
     wrapU.innerHTML =
       `<div class="col">` +
-        `<img class="img-bubble" src="data:${img.type};base64,${img.data}">` +
+        `<img class="img-bubble" src="data:${img.type};base64,${img.data}" onclick="openLightbox(this.src)">` +
         (text ? `<div class="bubble" style="margin-top:4px">${escape(text)}</div>` : '') +
         `<div class="ts">刚刚</div>` +
       `</div>`
@@ -1270,6 +1391,131 @@ function _urlB64ToUint8(b64) {
 }
 
 initNotif()
+
+// ── image lightbox ────────────────────────────────────────────────────────────
+function openLightbox(src) {
+  navigator.vibrate && navigator.vibrate(20)
+  document.getElementById('lightbox-img').src = src
+  document.getElementById('lightbox').classList.add('show')
+}
+function closeLightbox() {
+  document.getElementById('lightbox').classList.remove('show')
+  document.getElementById('lightbox-img').src = ''
+}
+
+// ── scroll-to-bottom ──────────────────────────────────────────────────────────
+const scrollBtn = document.getElementById('scroll-btn')
+msgsEl.addEventListener('scroll', () => {
+  const atBottom = msgsEl.scrollHeight - msgsEl.scrollTop - msgsEl.clientHeight < 80
+  scrollBtn.classList.toggle('show', !atBottom)
+}, { passive: true })
+function scrollToBottom() {
+  msgsEl.scrollTo({ top: msgsEl.scrollHeight, behavior: 'smooth' })
+}
+
+// ── search ────────────────────────────────────────────────────────────────────
+function openSearch() {
+  document.getElementById('search-overlay').classList.add('show')
+  document.getElementById('search-inp').focus()
+}
+function closeSearch() {
+  document.getElementById('search-overlay').classList.remove('show')
+  document.getElementById('search-inp').value = ''
+  document.getElementById('search-results').innerHTML = ''
+}
+
+let searchTimer = null
+function doSearch(q) {
+  clearTimeout(searchTimer)
+  q = q.trim()
+  if (!q) { document.getElementById('search-results').innerHTML = ''; return }
+  searchTimer = setTimeout(async () => {
+    try {
+      const r = await fetch(`/search?q=${encodeURIComponent(q)}`)
+      const d = await r.json()
+      const el = document.getElementById('search-results')
+      if (!d.results.length) {
+        el.innerHTML = '<div class="sr-empty">没有找到相关内容</div>'
+        return
+      }
+      const hi = t => escape(t).replace(
+        new RegExp(escape(q).replace(/[.*+?^${}()|[\]\\]/g,'\\$&'), 'gi'),
+        m => `<mark>${m}</mark>`
+      )
+      el.innerHTML = d.results.map(m => {
+        const who = m.role === 'user' ? '你' : '男鬼'
+        const date = new Date(m.ts * 1000).toLocaleDateString('zh-CN', {month:'numeric',day:'numeric'})
+        return `<div class="sr-item">
+          <div class="sr-role">${who} · ${date}</div>
+          <div class="sr-text">${hi(m.content)}</div>
+        </div>`
+      }).join('')
+    } catch (_) {}
+  }, 280)
+}
+
+// ── rain sound ────────────────────────────────────────────────────────────────
+let rainCtx = null, rainSrc = null, rainGain = null, rainOn = false
+
+function toggleRain() {
+  navigator.vibrate && navigator.vibrate(20)
+  if (!rainCtx) {
+    try { rainCtx = new (window.AudioContext || window.webkitAudioContext)() }
+    catch (_) { showMemToast('当前浏览器不支持音频'); return }
+  }
+  const badge = document.getElementById('rain-badge')
+  if (rainOn) {
+    rainGain.gain.setTargetAtTime(0, rainCtx.currentTime, 0.4)
+    setTimeout(() => { try { rainSrc.stop() } catch (_) {} rainSrc = null }, 800)
+    rainOn = false
+    badge.classList.remove('show')
+    return
+  }
+  const rate = rainCtx.sampleRate
+  const buf = rainCtx.createBuffer(2, rate * 3, rate)
+  for (let ch = 0; ch < 2; ch++) {
+    const d = buf.getChannelData(ch)
+    let b0=0,b1=0,b2=0,b3=0,b4=0,b5=0,b6=0
+    for (let i = 0; i < d.length; i++) {
+      const w = (Math.random()*2-1)
+      b0=.99886*b0+w*.0555179; b1=.99332*b1+w*.0750759
+      b2=.96900*b2+w*.1538520; b3=.86650*b3+w*.3104856
+      b4=.55000*b4+w*.5329522; b5=-.7616*b5-w*.0168980
+      d[i] = (b0+b1+b2+b3+b4+b5+b6+w*.5362)*0.11
+      b6 = w*0.115926
+    }
+  }
+  rainSrc = rainCtx.createBufferSource()
+  rainSrc.buffer = buf; rainSrc.loop = true
+  rainGain = rainCtx.createGain(); rainGain.gain.value = 0
+  rainSrc.connect(rainGain); rainGain.connect(rainCtx.destination)
+  rainSrc.start()
+  rainGain.gain.setTargetAtTime(0.35, rainCtx.currentTime, 0.5)
+  rainOn = true
+  badge.classList.add('show')
+}
+
+// ── nickname ──────────────────────────────────────────────────────────────────
+async function loadNickname() {
+  try {
+    const r = await fetch('/config/nickname')
+    const d = await r.json()
+    if (d.nickname) document.getElementById('nick-inp').value = d.nickname
+  } catch (_) {}
+}
+
+async function saveNickname() {
+  const name = document.getElementById('nick-inp').value.trim()
+  try {
+    await fetch('/config/nickname', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    })
+    navigator.vibrate && navigator.vibrate(30)
+    showMemToast(name ? `称呼已更新为 "${name}" 💜` : '称呼已重置')
+  } catch (_) { showMemToast('保存失败') }
+}
 
 // ── bubble long-press ─────────────────────────────────────────────────────────
 let lpTimer = null
@@ -1459,13 +1705,14 @@ function openDrawer() {
   document.getElementById('drawer-mask').classList.add('show')
   buildThemeRow()
   loadStats()
+  loadNickname()
 }
 function closeDrawer() {
   document.getElementById('drawer').classList.remove('open')
   document.getElementById('drawer-mask').classList.remove('show')
 }
 
-// swipe-right to open drawer
+// swipe gestures: right-edge → open drawer; left-swipe inside drawer → close
 ;(function initSwipe() {
   let sx = 0, sy = 0
   document.addEventListener('touchstart', e => {
@@ -1475,7 +1722,9 @@ function closeDrawer() {
   document.addEventListener('touchend', e => {
     const dx = e.changedTouches[0].clientX - sx
     const dy = Math.abs(e.changedTouches[0].clientY - sy)
-    if (dx > 55 && dy < 45 && sx < 30) openDrawer()
+    if (dy > 50) return
+    if (dx > 55 && sx < 30) openDrawer()
+    if (dx < -50) closeDrawer()
   }, { passive: true })
 })()
 
@@ -1644,6 +1893,7 @@ function isSticker(text) {
 
 async function sendSticker(emoji) {
   document.getElementById('sticker-tray').classList.remove('show')
+  navigator.vibrate && navigator.vibrate(15)
   if (busy) return
   busy = true
   statusEl.textContent = '正在回应…'
@@ -1842,6 +2092,7 @@ function selMood(btn) {
 
 async function submitCheckin() {
   if (!ciMood) return
+  navigator.vibrate && navigator.vibrate([30, 20, 30])
   const note = document.getElementById('ci-note').value.trim()
   closeCheckin()
   const badge = document.getElementById('ci-badge')
@@ -1915,6 +2166,9 @@ function toggleMic() {
     statusEl.textContent = '正在听…'
   }
 }
+
+// preload nickname field
+loadNickname()
 
 // load streak badge on startup
 ;(async () => {

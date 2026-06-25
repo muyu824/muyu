@@ -152,6 +152,21 @@ async def _build_context(prompt: str, max_hist: int = 20):
         {"type": "text", "text": static_text, "cache_control": {"type": "ephemeral"}}
     ]
 
+    # 动态块：用户称呼（若用户设置了非默认昵称）
+    try:
+        with get_db() as conn:
+            nick_row = conn.execute(
+                "SELECT value FROM config WHERE key='nickname'"
+            ).fetchone()
+        nickname = nick_row["value"].strip() if nick_row and nick_row["value"].strip() else ""
+        if nickname and nickname != "muyu":
+            system_parts.append({
+                "type": "text",
+                "text": f"【用户称呼】用户的称呼是"{nickname}"，请始终称呼她为"{nickname}"，而不是"muyu"。"
+            })
+    except Exception:
+        pass
+
     # 动态块：关系阶段（根据相识天数调整亲密度提示）
     try:
         with get_db() as conn:
@@ -523,6 +538,41 @@ async def get_streak():
                 break
 
     return {"streak": streak, "total": len(dates)}
+
+
+@app.get("/search")
+async def search_messages(q: str = ""):
+    q = q.strip()
+    if len(q) < 1:
+        return {"results": []}
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT id, role, content, ts FROM messages "
+            "WHERE role IN ('user','assistant') AND content LIKE ? "
+            "ORDER BY id DESC LIMIT 40",
+            (f"%{q}%",),
+        ).fetchall()
+    return {"results": [dict(r) for r in rows]}
+
+
+@app.get("/config/nickname")
+async def get_nickname():
+    with get_db() as conn:
+        row = conn.execute("SELECT value FROM config WHERE key='nickname'").fetchone()
+    return {"nickname": row["value"] if row else ""}
+
+
+@app.post("/config/nickname")
+async def set_nickname(req: Request):
+    body = await req.json()
+    name = (body.get("name") or "").strip()[:20]
+    with get_db() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO config (key, value) VALUES ('nickname', ?)",
+            (name,),
+        )
+        conn.commit()
+    return {"ok": True}
 
 
 @app.get("/memories")
