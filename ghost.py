@@ -84,6 +84,19 @@ async def call_ai(prompt, max_hist=20):
 
     system = PERSONA
 
+    try:
+        import sqlite3
+        mem_conn = sqlite3.connect('/data/ghost.db')
+        mem_rows = mem_conn.execute(
+            "SELECT content FROM memories ORDER BY id DESC LIMIT 10"
+        ).fetchall()
+        mem_conn.close()
+        if mem_rows:
+            mem_text = "\n".join(f"- {r[0]}" for r in mem_rows)
+            system += f"\n\n【关于muyu的记忆】\n{mem_text}"
+    except Exception:
+        pass
+
     # 读取最近活动
     with get_db() as conn:
         act_rows = conn.execute(
