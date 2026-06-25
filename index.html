@@ -262,6 +262,29 @@
     }
     #sticker-btn:active { background: rgba(123,47,255,.25); }
 
+    #mic-btn {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.05);
+      font-size: 18px;
+      cursor: pointer;
+      flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      -webkit-tap-highlight-color: transparent;
+      transition: background .15s, border-color .15s;
+    }
+    #mic-btn:active { background: rgba(123,47,255,.25); }
+    #mic-btn.listening {
+      background: rgba(210,40,40,.25);
+      border-color: rgba(210,40,40,.5);
+      animation: mic-pulse 1s ease-in-out infinite;
+    }
+    @keyframes mic-pulse {
+      0%,100% { box-shadow: 0 0 0 0 rgba(210,40,40,.45); }
+      50%      { box-shadow: 0 0 0 7px rgba(210,40,40,0); }
+    }
+
     #sticker-tray {
       display: none;
       position: absolute;
@@ -806,9 +829,10 @@
       <div class="sticker-grid" id="sticker-grid"></div>
     </div>
     <input type="file" id="img-input" accept="image/*" style="display:none" onchange="onImgSelect(event)">
-    <button id="img-btn" onclick="document.getElementById('img-input').click()">📷</button>
     <button id="sticker-btn" onclick="toggleStickers()">✨</button>
+    <button id="mic-btn" onclick="toggleMic()" style="display:none">🎤</button>
     <textarea id="inp" placeholder="说点什么…" rows="1"></textarea>
+    <button id="img-btn" onclick="document.getElementById('img-input').click()">📷</button>
     <button id="send" onclick="doSend()">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
            stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -1458,6 +1482,58 @@ async function submitCheckin() {
 }
 
 initCheckin()
+
+// ── voice input ───────────────────────────────────────────────────────────────
+let recog = null
+let micListening = false
+
+;(function initMic() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition
+  if (!SR) return
+  const btn = document.getElementById('mic-btn')
+  btn.style.display = ''
+
+  recog = new SR()
+  recog.lang = 'zh-CN'
+  recog.continuous = false
+  recog.interimResults = true
+
+  recog.onresult = e => {
+    const text = Array.from(e.results).map(r => r[0].transcript).join('')
+    inp.value = text
+    autoResize(inp)
+  }
+
+  recog.onend = () => {
+    micListening = false
+    btn.classList.remove('listening')
+    btn.textContent = '🎤'
+    statusEl.textContent = '在附近游荡…'
+    if (inp.value.trim()) doSend()
+  }
+
+  recog.onerror = () => {
+    micListening = false
+    btn.classList.remove('listening')
+    btn.textContent = '🎤'
+    statusEl.textContent = '在附近游荡…'
+  }
+})()
+
+function toggleMic() {
+  if (!recog) { alert('当前浏览器不支持语音输入'); return }
+  const btn = document.getElementById('mic-btn')
+  if (micListening) {
+    recog.stop()
+  } else {
+    inp.value = ''
+    try { recog.start() } catch (_) { return }
+    micListening = true
+    btn.classList.add('listening')
+    btn.textContent = '⏹'
+    statusEl.textContent = '正在听…'
+  }
+}
 
 // apply saved theme on load
 applyTheme(localStorage.getItem('theme') || '幽灵')
