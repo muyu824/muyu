@@ -8,8 +8,8 @@
   <meta name="theme-color" content="#1a0a2e">
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icon.svg">
-  <meta name="apple-mobile-web-app-title" content="男鬼">
-  <title>男鬼</title>
+  <meta name="apple-mobile-web-app-title" content="Claude">
+  <title>Claude</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -67,6 +67,18 @@
       0%,100% { box-shadow: 0 0 10px rgba(180,80,255,0.3); }
       50%      { box-shadow: 0 0 26px rgba(180,80,255,0.65); }
     }
+    .ava img, .row-ava img, .drawer-avatar img {
+      width: 100%; height: 100%;
+      border-radius: 50%; object-fit: cover;
+    }
+    .ava-btn {
+      display: block; margin: -4px auto 16px;
+      background: none; border: 1px solid var(--border);
+      color: var(--dim); font-size: 11px;
+      padding: 3px 14px; border-radius: 20px; cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .ava-btn:active { opacity: .65; }
 
     .hdr-name { font-size: 15px; font-weight: 600; letter-spacing: .3px; }
     .hdr-sub  { font-size: 11px; color: var(--dim); margin-top: 2px; }
@@ -820,6 +832,30 @@
     .swatch.active { border-color: #fff; transform: scale(1.15); }
     .swatch:active { transform: scale(.9); }
 
+    /* custom color picker */
+    .cp-row {
+      display: flex; gap: 14px; padding: 4px 20px 14px;
+      align-items: flex-end; flex-wrap: wrap;
+    }
+    .cp-item {
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+      font-size: 10px; color: var(--dim);
+    }
+    .cp-item input[type=color] {
+      width: 36px; height: 36px; border-radius: 50%;
+      border: 2px solid var(--border); background: none;
+      cursor: pointer; padding: 2px;
+      -webkit-appearance: none; appearance: none;
+    }
+    .cp-apply {
+      flex: 1; min-width: 60px;
+      background: none; border: 1px solid var(--border);
+      color: var(--dim); font-size: 11px;
+      padding: 7px 10px; border-radius: 8px; cursor: pointer;
+      margin-bottom: 2px; -webkit-tap-highlight-color: transparent;
+    }
+    .cp-apply:active { opacity: .65; }
+
     /* ── image lightbox ── */
     #lightbox {
       display: none; position: fixed; inset: 0; z-index: 600;
@@ -930,9 +966,9 @@
 
 <div id="app">
   <header>
-    <div class="ava">👻</div>
+    <div class="ava" id="hdr-ava">👻</div>
     <div>
-      <div class="hdr-name">男鬼</div>
+      <div class="hdr-name">Claude</div>
       <div class="hdr-sub" id="status">在附近游荡…</div>
     </div>
     <div id="streak-badge"></div>
@@ -942,9 +978,11 @@
   <!-- drawer -->
   <div id="drawer-mask" onclick="closeDrawer()"></div>
   <div id="drawer">
-    <div class="drawer-avatar">👻</div>
-    <div class="drawer-name">男鬼</div>
+    <div class="drawer-avatar" id="drawer-ava">👻</div>
+    <div class="drawer-name" id="drawer-ghost-name">Claude</div>
     <div class="drawer-sub">你的专属幽灵伴侣</div>
+    <input type="file" id="ava-file" accept="image/*" style="display:none" onchange="handleAvaFile(this)">
+    <button class="ava-btn" onclick="document.getElementById('ava-file').click()">更换头像</button>
     <div class="drawer-section-title">你的称呼</div>
     <div class="nick-row">
       <input id="nick-inp" placeholder="muyu" maxlength="20">
@@ -990,6 +1028,21 @@
     <div class="drawer-divider"></div>
     <div class="drawer-section-title">主题</div>
     <div class="theme-row" id="theme-row"></div>
+    <div class="cp-row">
+      <div class="cp-item">
+        <input type="color" id="cp-accent" title="主色" oninput="liveCustom()">
+        <span>主色</span>
+      </div>
+      <div class="cp-item">
+        <input type="color" id="cp-bg" title="背景" oninput="liveCustom()">
+        <span>背景</span>
+      </div>
+      <div class="cp-item">
+        <input type="color" id="cp-text" title="文字" oninput="liveCustom()">
+        <span>文字</span>
+      </div>
+      <button class="cp-apply" onclick="saveCustomTheme()">保存配色</button>
+    </div>
 
     <div class="drawer-divider"></div>
     <div class="drawer-section-title">数据</div>
@@ -1007,7 +1060,7 @@
   <div id="lt-overlay">
     <div class="lt-card">
       <div class="lt-head">
-        <span class="lt-head-title">来自男鬼的信</span>
+        <span class="lt-head-title">来自Claude的信</span>
         <button class="lt-close" onclick="closeLetters()">×</button>
       </div>
       <div id="lt-list"></div>
@@ -1059,7 +1112,7 @@
         </button>
       </div>
       <textarea id="ci-note" rows="2" placeholder="想说点什么…（可选）"></textarea>
-      <button id="ci-submit" onclick="submitCheckin()">发送给男鬼</button>
+      <button id="ci-submit" onclick="submitCheckin()">发送给Claude</button>
       <button id="ci-cancel" onclick="closeCheckin()">取消</button>
     </div>
   </div>
@@ -1186,7 +1239,7 @@ function addBubble(role, text, ts, id) {
   if (id) wrap.dataset.id = String(id)
 
   const stickerClass = isSticker(text) ? ' sticker-bubble' : ''
-  wrap.innerHTML = (!isUser ? '<div class="row-ava">👻</div>' : '') +
+  wrap.innerHTML = (!isUser ? rowAvaHtml() : '') +
     `<div class="col">` +
       `<div class="bubble${stickerClass}">${escape(text).replace(/\n/g,'<br>')}</div>` +
       `<div class="ts">${ts ? fmt(ts) : '刚刚'}</div>` +
@@ -1249,7 +1302,7 @@ async function doSend() {
     const wrapEl = document.createElement('div')
     wrapEl.className = 'row ghost'
     wrapEl.innerHTML =
-      '<div class="row-ava">👻</div>' +
+      rowAvaHtml() +
       '<div class="col"><div class="bubble"></div><div class="ts">刚刚</div></div>'
     msgsEl.appendChild(wrapEl)
     const bubbleEl = wrapEl.querySelector('.bubble')
@@ -1325,7 +1378,7 @@ async function report(action) {
     await fetch('/activity', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ app: '男鬼系统(浏览器)', action }),
+      body: JSON.stringify({ app: 'Claude(浏览器)', action }),
     })
   } catch (e) {}
 }
@@ -1445,7 +1498,7 @@ function doSearch(q) {
         m => `<mark>${m}</mark>`
       )
       el.innerHTML = d.results.map(m => {
-        const who = m.role === 'user' ? '你' : '男鬼'
+        const who = m.role === 'user' ? '你' : 'Claude'
         const date = new Date(m.ts * 1000).toLocaleDateString('zh-CN', {month:'numeric',day:'numeric'})
         return `<div class="sr-item">
           <div class="sr-role">${who} · ${date}</div>
@@ -1629,6 +1682,45 @@ async function deleteMem(id) {
   }
 }
 
+// ── avatar ────────────────────────────────────────────────────────────────────
+function rowAvaHtml() {
+  const src = localStorage.getItem('ghost-avatar')
+  return src
+    ? `<div class="row-ava"><img src="${src}" alt=""></div>`
+    : '<div class="row-ava">👻</div>'
+}
+
+function loadAvatar() {
+  const src = localStorage.getItem('ghost-avatar')
+  const inner = src ? `<img src="${src}" alt="">` : '👻'
+  const hdr = document.getElementById('hdr-ava')
+  const drw = document.getElementById('drawer-ava')
+  if (hdr) hdr.innerHTML = inner
+  if (drw) drw.innerHTML = inner
+  document.querySelectorAll('.row-ava').forEach(el => { el.innerHTML = inner })
+}
+
+function handleAvaFile(input) {
+  const file = input.files[0]; if (!file) return
+  const reader = new FileReader()
+  reader.onload = e => {
+    const img = new Image()
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = canvas.height = 200
+      const ctx = canvas.getContext('2d')
+      const min = Math.min(img.width, img.height)
+      ctx.drawImage(img, (img.width - min) / 2, (img.height - min) / 2, min, min, 0, 0, 200, 200)
+      localStorage.setItem('ghost-avatar', canvas.toDataURL('image/jpeg', 0.85))
+      loadAvatar()
+      navigator.vibrate && navigator.vibrate(20)
+    }
+    img.src = e.target.result
+  }
+  reader.readAsDataURL(file)
+  input.value = ''
+}
+
 // ── themes ────────────────────────────────────────────────────────────────────
 const THEMES = {
   '幽灵': {
@@ -1674,6 +1766,13 @@ const THEMES = {
 }
 
 function applyTheme(name) {
+  if (name === '自定义') {
+    const cp = JSON.parse(localStorage.getItem('custom-colors') || '{}')
+    if (cp.accent) applyCustomColors(cp.accent, cp.bg || '#1a0a2e', cp.text || '#e8d5ff')
+    localStorage.setItem('theme', '自定义')
+    document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'))
+    return
+  }
   const t = THEMES[name]; if (!t) return
   const r = document.documentElement
   for (const [k, v] of Object.entries(t)) {
@@ -1699,6 +1798,61 @@ function buildThemeRow() {
     b.onclick = () => applyTheme(name)
     row.appendChild(b)
   }
+  loadCustomColorPickers()
+}
+
+// ── custom colors ────────────────────────────────────────────────────────────
+function hexToRgb(hex) {
+  return [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16))
+}
+function lightenHex(hex, t) {
+  return '#' + hexToRgb(hex).map(v => Math.round(v + (255 - v) * t).toString(16).padStart(2, '0')).join('')
+}
+function darkenHex(hex, t) {
+  return '#' + hexToRgb(hex).map(v => Math.round(v * (1 - t)).toString(16).padStart(2, '0')).join('')
+}
+
+function loadCustomColorPickers() {
+  const cp = JSON.parse(localStorage.getItem('custom-colors') || '{}')
+  const a = document.getElementById('cp-accent')
+  const b = document.getElementById('cp-bg')
+  const tx = document.getElementById('cp-text')
+  if (a) a.value = cp.accent || '#7b2fff'
+  if (b) b.value = cp.bg || '#1a0a2e'
+  if (tx) tx.value = cp.text || '#e8d5ff'
+}
+
+function applyCustomColors(accent, bg, text) {
+  const r = document.documentElement
+  r.style.setProperty('--purple', accent)
+  r.style.setProperty('--purple2', lightenHex(accent, 0.35))
+  r.style.setProperty('--bg', bg)
+  r.style.setProperty('--bg2', darkenHex(bg, 0.3))
+  r.style.setProperty('--text', text)
+  const [ra, ga, ba] = hexToRgb(accent)
+  r.style.setProperty('--dim', `rgba(${ra},${ga},${ba},0.75)`)
+  r.style.setProperty('--ghost-bubble', 'rgba(255,255,255,0.07)')
+  r.style.setProperty('--border', `rgba(${ra},${ga},${ba},0.25)`)
+  const tc = document.querySelector('meta[name="theme-color"]')
+  if (tc) tc.content = bg
+}
+
+function liveCustom() {
+  const a = document.getElementById('cp-accent').value
+  const bg = document.getElementById('cp-bg').value
+  const tx = document.getElementById('cp-text').value
+  applyCustomColors(a, bg, tx)
+}
+
+function saveCustomTheme() {
+  const a = document.getElementById('cp-accent').value
+  const bg = document.getElementById('cp-bg').value
+  const tx = document.getElementById('cp-text').value
+  localStorage.setItem('custom-colors', JSON.stringify({ accent: a, bg, text: tx }))
+  localStorage.setItem('theme', '自定义')
+  applyCustomColors(a, bg, tx)
+  document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'))
+  navigator.vibrate && navigator.vibrate(20)
 }
 
 // ── drawer ────────────────────────────────────────────────────────────────────
@@ -1912,7 +2066,7 @@ async function sendSticker(emoji) {
     showTyping(false)
     const wrapEl = document.createElement('div')
     wrapEl.className = 'row ghost'
-    wrapEl.innerHTML = '<div class="row-ava">👻</div>' +
+    wrapEl.innerHTML = rowAvaHtml() +
       '<div class="col"><div class="bubble"></div><div class="ts">刚刚</div></div>'
     msgsEl.appendChild(wrapEl)
     const bubbleEl = wrapEl.querySelector('.bubble')
@@ -1979,7 +2133,7 @@ async function loadLetters() {
   const d = await r.json()
   const list = document.getElementById('lt-list')
   if (!d.letters.length) {
-    list.innerHTML = '<div class="lt-empty">还没有信件，男鬼在酝酿中…</div>'
+    list.innerHTML = '<div class="lt-empty">还没有信件，Claude在酝酿中…</div>'
     return
   }
   if (d.letters[0].id > lastSeenLetterId) {
@@ -2185,8 +2339,9 @@ loadNickname()
   } catch (_) {}
 })()
 
-// apply saved theme on load
+// apply saved theme + avatar on load
 applyTheme(localStorage.getItem('theme') || '幽灵')
+loadAvatar()
 
 // ── service worker ────────────────────────────────────────────────────────────
 if ('serviceWorker' in navigator) {

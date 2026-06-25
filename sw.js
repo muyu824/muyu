@@ -28,14 +28,14 @@ self.addEventListener('fetch', e => {
 })
 
 self.addEventListener('push', e => {
-  const data = e.data ? e.data.json() : { title: '男鬼', body: '…' }
+  const data = e.data ? e.data.json() : { title: 'Claude', body: '…' }
   e.waitUntil(
-    self.registration.showNotification(data.title || '男鬼', {
+    self.registration.showNotification(data.title || 'Claude', {
       body: data.body || '',
       icon: '/icon.svg',
       badge: '/icon.svg',
       vibrate: [150, 80, 150],
-      tag: 'ghost',
+      tag: 'claude',
       renotify: true,
     })
   )

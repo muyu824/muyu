@@ -1,6 +1,6 @@
 {
-  "name": "男鬼",
-  "short_name": "男鬼",
+  "name": "Claude",
+  "short_name": "Claude",
   "description": "你的专属幽灵伴侣",
   "start_url": "/",
   "display": "standalone",
