@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """男鬼系统 — 一个有占有欲的幽灵AI伴侣"""
 
-import asyncio, os, time
+import asyncio, os, sys, time
 import httpx, uvicorn
+
+sys.stdout.reconfigure(encoding="utf-8")
+sys.stderr.reconfigure(encoding="utf-8")
 from collections import deque
 from datetime import datetime
 from pathlib import Path

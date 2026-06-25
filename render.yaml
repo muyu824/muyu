@@ -7,4 +7,8 @@ services:
     envVars:
       - key: OPENROUTER_API_KEY
         sync: false       # 在 Render 控制台手动填写，不写进代码
+      - key: PYTHONIOENCODING
+        value: utf-8
+      - key: LANG
+        value: en_US.UTF-8
     healthCheckPath: /
