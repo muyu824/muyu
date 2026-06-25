@@ -932,6 +932,139 @@
     }
     .cp-apply:active { opacity: .65; }
 
+    /* ── traces overlay ── */
+    #trace-overlay {
+      display: none; position: fixed; inset: 0;
+      background: var(--modal-bg);
+      backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+      z-index: 200; align-items: flex-start; justify-content: center;
+      padding-top: max(50px, env(safe-area-inset-top)); overflow-y: auto;
+    }
+    #trace-overlay.show { display: flex; }
+    .trace-card {
+      background: rgba(255,255,255,.05); border: 1px solid var(--border);
+      border-radius: 22px; padding: 24px 20px;
+      width: min(380px, 92vw); margin-bottom: 40px;
+    }
+    .trace-head {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 18px;
+    }
+    .trace-head-title { font-size: 15px; font-weight: 600; }
+    .trace-close { background: none; border: none; color: var(--dim); font-size: 20px; cursor: pointer; }
+    .trace-empty { color: var(--dim); font-size: 13px; text-align: center; padding: 20px 0; }
+    .trace-item {
+      display: flex; gap: 12px; align-items: flex-start;
+      padding: 10px 0; border-bottom: 1px solid var(--border);
+    }
+    .trace-item:last-child { border-bottom: none; }
+    .trace-time { font-size: 11px; color: var(--dim); white-space: nowrap; padding-top: 2px; flex-shrink: 0; }
+    .trace-desc { font-size: 14px; line-height: 1.5; color: var(--text); }
+
+    /* ── books overlay ── */
+    #books-overlay {
+      display: none; position: fixed; inset: 0;
+      background: var(--modal-bg);
+      backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+      z-index: 200; align-items: flex-start; justify-content: center;
+      padding-top: max(50px, env(safe-area-inset-top)); overflow-y: auto;
+    }
+    #books-overlay.show { display: flex; }
+    .books-card {
+      background: rgba(255,255,255,.05); border: 1px solid var(--border);
+      border-radius: 22px; padding: 24px 20px;
+      width: min(400px, 92vw); margin-bottom: 40px;
+    }
+    .books-head {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 18px;
+    }
+    .books-head-title { font-size: 15px; font-weight: 600; }
+    .books-close { background: none; border: none; color: var(--dim); font-size: 20px; cursor: pointer; }
+    .book-item {
+      background: rgba(255,255,255,.04); border: 1px solid var(--border);
+      border-radius: 14px; padding: 12px 14px; margin-bottom: 8px; cursor: pointer;
+      transition: background .15s; -webkit-tap-highlight-color: transparent;
+    }
+    .book-item:active { background: rgba(123,47,255,.15); }
+    .book-item.finished { opacity: .55; }
+    .book-row1 { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+    .book-title { font-size: 14px; font-weight: 600; }
+    .book-author { font-size: 11px; color: var(--dim); }
+    .book-progress-wrap {
+      height: 4px; background: var(--border); border-radius: 2px; margin-bottom: 5px;
+    }
+    .book-progress-fill {
+      height: 100%; border-radius: 2px;
+      background: linear-gradient(90deg, var(--purple), var(--purple2));
+      transition: width .3s;
+    }
+    .book-meta { font-size: 11px; color: var(--dim); }
+    .book-notes-preview {
+      font-size: 12px; color: var(--dim); margin-top: 4px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .books-add-btn {
+      width: 100%; padding: 11px; border: 1.5px dashed var(--border);
+      border-radius: 14px; background: none; color: var(--dim);
+      font-size: 14px; cursor: pointer; margin-top: 4px;
+      transition: border-color .15s, color .15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .books-add-btn:active { border-color: var(--purple); color: var(--purple); }
+    .books-empty { color: var(--dim); font-size: 13px; text-align: center; padding: 20px 0; }
+    /* book edit panel */
+    #book-edit-panel {
+      display: none; margin-top: 16px;
+      background: rgba(255,255,255,.04); border: 1px solid var(--border);
+      border-radius: 14px; padding: 16px;
+    }
+    #book-edit-panel.show { display: block; }
+    .book-field { margin-bottom: 10px; }
+    .book-field label { font-size: 11px; color: var(--dim); display: block; margin-bottom: 4px; }
+    .book-inp {
+      width: 100%; background: rgba(255,255,255,.06);
+      border: 1px solid var(--border); border-radius: 10px;
+      padding: 8px 11px; color: var(--text); font-size: 14px;
+      font-family: inherit; outline: none;
+    }
+    .book-inp:focus { border-color: var(--purple); }
+    .book-progress-inp {
+      width: 100%; appearance: none; -webkit-appearance: none;
+      height: 4px; border-radius: 2px; outline: none; cursor: pointer;
+      background: var(--border);
+    }
+    .book-progress-inp::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 16px; height: 16px;
+      border-radius: 50%; background: var(--purple2); cursor: pointer;
+    }
+    .book-progress-lbl { font-size: 11px; color: var(--dim); text-align: right; margin-top: 3px; }
+    .book-textarea {
+      width: 100%; background: rgba(255,255,255,.06);
+      border: 1px solid var(--border); border-radius: 10px;
+      padding: 8px 11px; color: var(--text); font-size: 13px;
+      font-family: inherit; outline: none; resize: none;
+    }
+    .book-textarea:focus { border-color: var(--purple); }
+    .book-finished-row {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 12px; color: var(--dim); margin-bottom: 12px; cursor: pointer;
+    }
+    .book-edit-btns { display: flex; gap: 8px; }
+    .book-save-btn {
+      flex: 1; padding: 10px; border: none; border-radius: 12px;
+      background: linear-gradient(135deg, var(--purple), var(--purple2));
+      color: #fff; font-size: 14px; cursor: pointer;
+    }
+    .book-del-btn {
+      padding: 10px 14px; border: 1px solid var(--border); border-radius: 12px;
+      background: none; color: var(--dim); font-size: 14px; cursor: pointer;
+    }
+    .book-cancel-btn {
+      padding: 10px 14px; border: none; border-radius: 12px;
+      background: none; color: var(--dim); font-size: 14px; cursor: pointer;
+    }
+
     /* ── image lightbox ── */
     #lightbox {
       display: none; position: fixed; inset: 0; z-index: 600;
@@ -1093,6 +1226,12 @@
     <div class="drawer-item" onclick="closeDrawer();openMemories()">
       <span class="drawer-label">我的记忆</span>
     </div>
+    <div class="drawer-item" onclick="closeDrawer();openTraces()">
+      <span class="drawer-label">踪迹</span>
+    </div>
+    <div class="drawer-item" onclick="closeDrawer();openBooks()">
+      <span class="drawer-label">书架</span>
+    </div>
 
     <div class="drawer-divider"></div>
     <div class="drawer-section-title">主题</div>
@@ -1250,6 +1389,57 @@
       <button class="mem-close" onclick="closeMemories()">✕</button>
     </div>
     <div id="mem-list"></div>
+  </div>
+</div>
+
+<!-- traces overlay -->
+<div id="trace-overlay">
+  <div class="trace-card">
+    <div class="trace-head">
+      <div class="trace-head-title">男鬼踪迹</div>
+      <button class="trace-close" onclick="closeTraces()">×</button>
+    </div>
+    <div id="trace-list"></div>
+  </div>
+</div>
+
+<!-- books overlay -->
+<div id="books-overlay">
+  <div class="books-card">
+    <div class="books-head">
+      <div class="books-head-title">书架</div>
+      <button class="books-close" onclick="closeBooks()">×</button>
+    </div>
+    <div id="book-list"></div>
+    <button class="books-add-btn" onclick="showBookForm(null)">+ 添加书籍</button>
+    <div id="book-edit-panel">
+      <div class="book-field">
+        <label>书名</label>
+        <input class="book-inp" id="book-title-inp" placeholder="书名（必填）" maxlength="100">
+      </div>
+      <div class="book-field">
+        <label>作者（可选）</label>
+        <input class="book-inp" id="book-author-inp" placeholder="作者" maxlength="60">
+      </div>
+      <div class="book-field">
+        <label>阅读进度</label>
+        <input type="range" class="book-progress-inp" id="book-progress-inp" min="0" max="100" value="0" oninput="document.getElementById('book-progress-val').textContent=this.value+'%'">
+        <div class="book-progress-lbl"><span id="book-progress-val">0%</span></div>
+      </div>
+      <div class="book-field">
+        <label>笔记 / 感想</label>
+        <textarea class="book-textarea" id="book-notes-inp" rows="3" placeholder="写下你的想法…" maxlength="500"></textarea>
+      </div>
+      <label class="book-finished-row">
+        <input type="checkbox" id="book-finished-inp">
+        <span>已读完</span>
+      </label>
+      <div class="book-edit-btns">
+        <button class="book-save-btn" onclick="saveBook()">保存</button>
+        <button class="book-del-btn" id="book-del-btn" onclick="confirmDeleteBook()" style="display:none">删除</button>
+        <button class="book-cancel-btn" onclick="hideBookForm()">取消</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -2393,6 +2583,136 @@ function closeLetter() {
 }
 
 initLetters()
+
+// ── traces ────────────────────────────────────────────────────────────────────
+function openTraces() {
+  document.getElementById('trace-overlay').classList.add('show')
+  loadTraces()
+}
+function closeTraces() {
+  document.getElementById('trace-overlay').classList.remove('show')
+}
+
+async function loadTraces() {
+  const list = document.getElementById('trace-list')
+  list.innerHTML = '<div class="trace-empty">加载中…</div>'
+  try {
+    const r = await fetch('/traces?limit=40')
+    const d = await r.json()
+    if (!d.traces.length) {
+      list.innerHTML = '<div class="trace-empty">还没有踪迹记录，与Claude对话后会自动生成</div>'
+      return
+    }
+    list.innerHTML = d.traces.map(t => {
+      const dt = new Date(t.ts * 1000)
+      const time = dt.getMonth()+1 + '/' + dt.getDate() + ' ' +
+        dt.getHours().toString().padStart(2,'0') + ':' +
+        dt.getMinutes().toString().padStart(2,'0')
+      return `<div class="trace-item">
+        <div class="trace-time">${time}</div>
+        <div class="trace-desc">${escape(t.description)}</div>
+      </div>`
+    }).join('')
+  } catch (_) {
+    list.innerHTML = '<div class="trace-empty">加载失败</div>'
+  }
+}
+
+// ── books ─────────────────────────────────────────────────────────────────────
+let _editingBookId = null
+
+function openBooks() {
+  document.getElementById('books-overlay').classList.add('show')
+  hideBookForm()
+  loadBooks()
+}
+function closeBooks() {
+  document.getElementById('books-overlay').classList.remove('show')
+}
+
+async function loadBooks() {
+  const list = document.getElementById('book-list')
+  try {
+    const r = await fetch('/books')
+    const d = await r.json()
+    if (!d.books.length) {
+      list.innerHTML = '<div class="books-empty">书架空空，添加第一本书吧</div>'
+      return
+    }
+    list.innerHTML = d.books.map(b => {
+      const pct = b.progress + '%'
+      const meta = b.finished ? '已读完' : `${b.progress}%`
+      const authorStr = b.author ? ` · ${b.author}` : ''
+      const notesStr = b.notes ? `<div class="book-notes-preview">${escape(b.notes)}</div>` : ''
+      return `<div class="book-item${b.finished?' finished':''}" onclick="showBookForm(${JSON.stringify(b)})">
+        <div class="book-row1">
+          <span class="book-title">${escape(b.title)}</span>
+          <span class="book-author">${escape(authorStr)}</span>
+        </div>
+        <div class="book-progress-wrap">
+          <div class="book-progress-fill" style="width:${pct}"></div>
+        </div>
+        <div class="book-meta">${meta}</div>
+        ${notesStr}
+      </div>`
+    }).join('')
+  } catch (_) {
+    list.innerHTML = '<div class="books-empty">加载失败</div>'
+  }
+}
+
+function showBookForm(book) {
+  _editingBookId = book ? book.id : null
+  document.getElementById('book-title-inp').value  = book ? book.title  : ''
+  document.getElementById('book-author-inp').value = book ? book.author : ''
+  const prog = book ? book.progress : 0
+  document.getElementById('book-progress-inp').value = prog
+  document.getElementById('book-progress-val').textContent = prog + '%'
+  document.getElementById('book-notes-inp').value    = book ? book.notes   : ''
+  document.getElementById('book-finished-inp').checked = !!(book && book.finished)
+  document.getElementById('book-del-btn').style.display = book ? '' : 'none'
+  document.getElementById('book-edit-panel').classList.add('show')
+  document.getElementById('book-title-inp').focus()
+}
+
+function hideBookForm() {
+  _editingBookId = null
+  document.getElementById('book-edit-panel').classList.remove('show')
+}
+
+async function saveBook() {
+  const title    = document.getElementById('book-title-inp').value.trim()
+  const author   = document.getElementById('book-author-inp').value.trim()
+  const progress = +document.getElementById('book-progress-inp').value
+  const notes    = document.getElementById('book-notes-inp').value.trim()
+  const finished = document.getElementById('book-finished-inp').checked ? 1 : 0
+  if (!title) { showMemToast('请填写书名'); return }
+  try {
+    if (_editingBookId) {
+      await fetch(`/books/${_editingBookId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, author, progress, notes, finished }),
+      })
+    } else {
+      await fetch('/books', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, author, progress, notes }),
+      })
+    }
+    navigator.vibrate && navigator.vibrate(20)
+    hideBookForm()
+    loadBooks()
+  } catch (_) { showMemToast('保存失败') }
+}
+
+async function confirmDeleteBook() {
+  if (!_editingBookId) return
+  await fetch(`/books/${_editingBookId}`, { method: 'DELETE' })
+  hideBookForm()
+  loadBooks()
+}
 
 // ── countdown ─────────────────────────────────────────────────────────────────
 async function openCd() {

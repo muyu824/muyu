@@ -117,6 +117,24 @@ def init_db():
                 ts      REAL NOT NULL
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS traces (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                description TEXT    NOT NULL,
+                ts          REAL    NOT NULL
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS books (
+                id       INTEGER PRIMARY KEY AUTOINCREMENT,
+                title    TEXT    NOT NULL,
+                author   TEXT    DEFAULT '',
+                progress INTEGER DEFAULT 0,
+                notes    TEXT    DEFAULT '',
+                ts       REAL    NOT NULL,
+                finished INTEGER DEFAULT 0
+            )
+        """)
         conn.commit()
 
 
@@ -223,6 +241,30 @@ async def _build_context(prompt: str, max_hist: int = 20):
                 cd_lines.append(f"- {r['name']}：已过 {-delta} 天")
         system_parts.append({"type": "text", "text": "【重要日期倒计时】\n" + "\n".join(cd_lines)})
 
+    # 动态块：书架（正在阅读的书）
+    try:
+        with get_db() as conn:
+            book_rows = conn.execute(
+                "SELECT title, author, progress, notes FROM books "
+                "WHERE finished=0 ORDER BY ts DESC LIMIT 5"
+            ).fetchall()
+        if book_rows:
+            book_lines = []
+            for b in book_rows:
+                line = f"《{b['title']}》"
+                if b["author"]:
+                    line += f"（{b['author']}）"
+                line += f" 已读{b['progress']}%"
+                if b["notes"]:
+                    line += f"，她的想法：{b['notes'][:60]}"
+                book_lines.append(f"- {line}")
+            system_parts.append({
+                "type": "text",
+                "text": "【她的书架·正在读】\n" + "\n".join(book_lines)
+            })
+    except Exception:
+        pass
+
     # 动态块：最近活动（变化频繁，不缓存）
     with get_db() as conn:
         act_rows = conn.execute(
@@ -252,6 +294,43 @@ ANTHROPIC_HEADERS = {
     "anthropic-beta": "prompt-caching-2024-07-31",
     "content-type": "application/json",
 }
+
+
+async def extract_trace(reply_text: str):
+    """AI回复后提取一句行踪描述，存入 traces 表。"""
+    if not API_KEY or not reply_text.strip():
+        return
+    snippet = reply_text[:300].replace('\n', ' ')
+    prompt = (
+        f'根据男鬼说的话，用10-15个字描述他现在在做什么或什么状态。'
+        f'只输出描述，不加引号标点。示例：伏在窗边凝视她的屏幕\n'
+        f'男鬼说：「{snippet}」'
+    )
+    try:
+        headers = {**ANTHROPIC_HEADERS, "x-api-key": API_KEY}
+        async with httpx.AsyncClient(timeout=20) as c:
+            r = await c.post(
+                "https://api.anthropic.com/v1/messages",
+                headers=headers,
+                json={
+                    "model": "claude-haiku-4-5-20251001",
+                    "system": "你只输出10-15字的行为描述，不加引号或标点。",
+                    "messages": [{"role": "user", "content": prompt}],
+                    "max_tokens": 40,
+                },
+            )
+            r.raise_for_status()
+            desc = r.json()["content"][0]["text"].strip().strip('「」""''。，、！？…')
+            if desc:
+                with get_db() as conn:
+                    conn.execute(
+                        "INSERT INTO traces (description, ts) VALUES (?, ?)",
+                        (desc, time.time()),
+                    )
+                    conn.commit()
+                print(f"[trace] {desc}")
+    except Exception as e:
+        print(f"[trace] 提取失败: {e}")
 
 
 async def call_ai(prompt, max_hist=20, max_tokens=150):
@@ -795,6 +874,7 @@ async def chat_stream(req: Request):
         if full_text:
             m = push_msg("assistant", full_text.strip())
             yield f"data: {json.dumps({'done': True, 'id': m['id']})}\n\n"
+            asyncio.create_task(extract_trace(full_text.strip()))
         else:
             m = push_msg("assistant", "…（没有收到回复）")
             yield f"data: {json.dumps({'done': True, 'id': m['id']})}\n\n"
@@ -894,6 +974,71 @@ async def letter_loop():
                 conn.commit()
             await send_ntfy("📬 你有一封新信件")
             print(f"[letter] 新信件已写好（{len(letter)}字）")
+
+
+@app.get("/traces")
+async def list_traces(limit: int = 40):
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT id, description, ts FROM traces ORDER BY id DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+    return {"traces": [dict(r) for r in rows]}
+
+
+@app.get("/books")
+async def list_books():
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT id, title, author, progress, notes, ts, finished FROM books ORDER BY finished ASC, ts DESC"
+        ).fetchall()
+    return {"books": [dict(r) for r in rows]}
+
+
+@app.post("/books")
+async def add_book(req: Request):
+    data = await req.json()
+    title = (data.get("title") or "").strip()
+    if not title:
+        return JSONResponse({"error": "missing title"}, status_code=400)
+    author   = (data.get("author") or "").strip()
+    progress = max(0, min(100, int(data.get("progress") or 0)))
+    notes    = (data.get("notes") or "").strip()[:500]
+    with get_db() as conn:
+        cur = conn.execute(
+            "INSERT INTO books (title, author, progress, notes, ts, finished) VALUES (?,?,?,?,?,0)",
+            (title, author, progress, notes, time.time()),
+        )
+        conn.commit()
+    return {"id": cur.lastrowid, "title": title}
+
+
+@app.put("/books/{book_id}")
+async def update_book(book_id: int, req: Request):
+    data = await req.json()
+    with get_db() as conn:
+        row = conn.execute("SELECT * FROM books WHERE id=?", (book_id,)).fetchone()
+        if not row:
+            return JSONResponse({"error": "not found"}, status_code=404)
+        title    = (data.get("title") or row["title"]).strip() or row["title"]
+        author   = (data.get("author") if data.get("author") is not None else row["author"]).strip()
+        progress = max(0, min(100, int(data.get("progress") if data.get("progress") is not None else row["progress"])))
+        notes    = (data.get("notes") if data.get("notes") is not None else row["notes"]).strip()[:500]
+        finished = int(data.get("finished") if data.get("finished") is not None else row["finished"])
+        conn.execute(
+            "UPDATE books SET title=?, author=?, progress=?, notes=?, finished=? WHERE id=?",
+            (title, author, progress, notes, finished, book_id),
+        )
+        conn.commit()
+    return {"ok": True}
+
+
+@app.delete("/books/{book_id}")
+async def delete_book(book_id: int):
+    with get_db() as conn:
+        conn.execute("DELETE FROM books WHERE id=?", (book_id,))
+        conn.commit()
+    return {"ok": True}
 
 
 @app.on_event("startup")
