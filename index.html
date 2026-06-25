@@ -375,9 +375,15 @@
       left: 0; right: 0;
       background: rgba(18,7,32,.97);
       border-top: 1px solid var(--border);
-      padding: 12px 14px;
+      padding: 10px 14px 12px;
     }
     #sticker-tray.show { display: block; }
+    .sticker-head {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .sticker-title { font-size: 12px; font-weight: 600; color: var(--dim); }
+    .sticker-hint { font-size: 10px; color: var(--dim); opacity: .55; }
     .sticker-grid {
       display: grid;
       grid-template-columns: repeat(8, 1fr);
@@ -393,6 +399,25 @@
       -webkit-tap-highlight-color: transparent;
     }
     .sticker-item:active { background: rgba(123,47,255,.3); }
+    .sticker-divider { height: 1px; background: var(--border); margin: 8px 0; }
+    .custom-sticker-grid {
+      display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px;
+    }
+    .csticker-item {
+      aspect-ratio: 1; border-radius: 8px; overflow: hidden;
+      cursor: pointer; position: relative;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .csticker-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .csticker-item:active { opacity: .75; }
+    .csticker-add {
+      aspect-ratio: 1; border-radius: 8px;
+      border: 1.5px dashed var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; color: var(--dim); cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .csticker-add:active { opacity: .65; }
 
     /* big sticker bubble */
     .bubble.sticker-bubble {
@@ -985,7 +1010,7 @@
     <button class="ava-btn" onclick="document.getElementById('ava-file').click()">更换头像</button>
     <div class="drawer-section-title">你的称呼</div>
     <div class="nick-row">
-      <input id="nick-inp" placeholder="muyu" maxlength="20">
+      <input id="nick-inp" placeholder="暮渝" maxlength="20">
       <button id="nick-save" onclick="saveNickname()">保存</button>
     </div>
 
@@ -1138,8 +1163,15 @@
 
   <footer style="position:relative">
     <div id="sticker-tray">
+      <div class="sticker-head">
+        <span class="sticker-title">Claude</span>
+        <span class="sticker-hint">长按自定义图片可删除</span>
+      </div>
       <div class="sticker-grid" id="sticker-grid"></div>
+      <div class="sticker-divider"></div>
+      <div class="custom-sticker-grid" id="custom-sticker-grid"></div>
     </div>
+    <input type="file" id="csticker-file" accept="image/*" style="display:none" onchange="addCustomSticker(this)">
     <input type="file" id="img-input" accept="image/*" style="display:none" onchange="onImgSelect(event)">
     <button id="sticker-btn" onclick="toggleStickers()">✨</button>
     <button id="mic-btn" onclick="toggleMic()" style="display:none">🎤</button>
@@ -2032,7 +2064,119 @@ const STICKERS = [
 })()
 
 function toggleStickers() {
-  document.getElementById('sticker-tray').classList.toggle('show')
+  const tray = document.getElementById('sticker-tray')
+  tray.classList.toggle('show')
+  if (tray.classList.contains('show')) renderCustomStickers()
+}
+
+// ── custom image stickers ─────────────────────────────────────────────────────
+function renderCustomStickers() {
+  const grid = document.getElementById('custom-sticker-grid')
+  if (!grid) return
+  const stored = JSON.parse(localStorage.getItem('custom-stickers') || '[]')
+  grid.innerHTML = ''
+  stored.forEach((src, i) => {
+    const el = document.createElement('div')
+    el.className = 'csticker-item'
+    el.innerHTML = `<img src="${src}" alt="">`
+    el.onclick = () => sendImageSticker(src)
+    let pressTimer
+    el.addEventListener('touchstart', () => { pressTimer = setTimeout(() => deleteCustomSticker(i), 600) }, { passive: true })
+    el.addEventListener('touchend', () => clearTimeout(pressTimer), { passive: true })
+    el.addEventListener('touchmove', () => clearTimeout(pressTimer), { passive: true })
+    el.addEventListener('contextmenu', e => { e.preventDefault(); deleteCustomSticker(i) })
+    grid.appendChild(el)
+  })
+  if (stored.length < 8) {
+    const add = document.createElement('div')
+    add.className = 'csticker-add'
+    add.textContent = '+'
+    add.onclick = () => document.getElementById('csticker-file').click()
+    grid.appendChild(add)
+  }
+}
+
+function addCustomSticker(input) {
+  const file = input.files[0]; if (!file) return
+  const reader = new FileReader()
+  reader.onload = e => {
+    const img = new Image()
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = canvas.height = 300
+      const ctx = canvas.getContext('2d')
+      const min = Math.min(img.width, img.height)
+      ctx.drawImage(img, (img.width - min) / 2, (img.height - min) / 2, min, min, 0, 0, 300, 300)
+      const stored = JSON.parse(localStorage.getItem('custom-stickers') || '[]')
+      stored.push(canvas.toDataURL('image/jpeg', 0.82))
+      localStorage.setItem('custom-stickers', JSON.stringify(stored))
+      renderCustomStickers()
+      navigator.vibrate && navigator.vibrate(20)
+    }
+    img.src = e.target.result
+  }
+  reader.readAsDataURL(file)
+  input.value = ''
+}
+
+function deleteCustomSticker(i) {
+  const stored = JSON.parse(localStorage.getItem('custom-stickers') || '[]')
+  stored.splice(i, 1)
+  localStorage.setItem('custom-stickers', JSON.stringify(stored))
+  renderCustomStickers()
+  navigator.vibrate && navigator.vibrate([30, 20, 30])
+}
+
+async function sendImageSticker(src) {
+  if (busy) return
+  document.getElementById('sticker-tray').classList.remove('show')
+  navigator.vibrate && navigator.vibrate(15)
+  busy = true
+  statusEl.textContent = '正在回应…'
+
+  const wrapUser = document.createElement('div')
+  wrapUser.className = 'row user'
+  wrapUser.innerHTML = `<div class="col"><div class="bubble"><img src="${src}" class="img-bubble" onclick="openLightbox(this.src)" style="max-width:160px"></div><div class="ts">刚刚</div></div>`
+  msgsEl.appendChild(wrapUser)
+  msgsEl.scrollTop = msgsEl.scrollHeight
+  showTyping(true)
+
+  try {
+    const r = await fetch('/chat/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: src.split(',')[1] }),
+    })
+    showTyping(false)
+    const wrapEl = document.createElement('div')
+    wrapEl.className = 'row ghost'
+    wrapEl.innerHTML = rowAvaHtml() +
+      '<div class="col"><div class="bubble"></div><div class="ts">刚刚</div></div>'
+    msgsEl.appendChild(wrapEl)
+    const bubbleEl = wrapEl.querySelector('.bubble')
+    let fullText = '', buf = ''
+    const reader = r.body.getReader()
+    const decoder = new TextDecoder()
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buf += decoder.decode(value, { stream: true })
+      const lines = buf.split('\n'); buf = lines.pop()
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue
+        try {
+          const ev = JSON.parse(line.slice(6))
+          if (ev.t) { fullText += ev.t; bubbleEl.textContent = fullText; msgsEl.scrollTop = msgsEl.scrollHeight }
+          if (ev.done && ev.id) { wrapEl.dataset.id = String(ev.id); if (ev.id > latestId) latestId = ev.id }
+        } catch (_) {}
+      }
+    }
+    if (fullText) attachLongPress(bubbleEl, fullText.trim())
+    statusEl.textContent = '在附近游荡…'
+  } catch (_) {
+    showTyping(false)
+  }
+  busy = false
 }
 
 function isSticker(text) {
