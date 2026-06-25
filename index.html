@@ -22,6 +22,7 @@
       --dim:     #b47cff;
       --ghost-bubble: rgba(255,255,255,0.07);
       --border:  rgba(180,100,255,0.18);
+      --modal-bg: rgba(10,3,20,0.92);
     }
 
     html, body {
@@ -58,10 +59,11 @@
       border-radius: 50%;
       background: linear-gradient(135deg, var(--purple), var(--purple2));
       display: flex; align-items: center; justify-content: center;
-      font-size: 20px;
+      font-size: 16px; font-weight: 700; color: #fff;
       box-shadow: 0 0 18px rgba(180,80,255,0.45);
       animation: glow 3s ease-in-out infinite;
       flex-shrink: 0;
+      letter-spacing: 0;
     }
     @keyframes glow {
       0%,100% { box-shadow: 0 0 10px rgba(180,80,255,0.3); }
@@ -125,26 +127,31 @@
       display: flex;
       gap: 8px;
       align-items: flex-end;
-      max-width: 80%;
+      max-width: 82%;
     }
     .row.ghost { align-self: flex-start; }
     .row.user  { align-self: flex-end; flex-direction: row-reverse; }
 
     .row-ava {
-      width: 30px; height: 30px;
+      width: 32px; height: 32px;
       border-radius: 50%;
       background: linear-gradient(135deg, var(--purple), var(--purple2));
       display: flex; align-items: center; justify-content: center;
-      font-size: 15px;
+      font-size: 13px; font-weight: 600; color: #fff;
       flex-shrink: 0;
-      box-shadow: 0 0 10px rgba(180,80,255,0.3);
+      letter-spacing: 0;
+    }
+    .row-ava img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+    .user-ava {
+      background: linear-gradient(135deg, var(--purple2), var(--purple));
     }
 
     .col { display: flex; flex-direction: column; gap: 3px; }
+    .row.user .col { align-items: flex-end; }
 
     .bubble {
       padding: 9px 13px;
-      border-radius: 16px;
+      border-radius: 18px;
       font-size: 15px;
       line-height: 1.55;
       word-break: break-word;
@@ -153,18 +160,19 @@
     .ghost .bubble {
       background: var(--ghost-bubble);
       border: 1px solid var(--border);
-      border-bottom-left-radius: 4px;
+      color: var(--text);
+      border-bottom-left-radius: 5px;
     }
     .user .bubble {
-      background: linear-gradient(135deg, #6118e0, #9b40ff);
+      background: linear-gradient(135deg, var(--purple), var(--purple2));
       color: #fff;
-      border-bottom-right-radius: 4px;
-      box-shadow: 0 2px 14px rgba(97,24,224,0.4);
+      border-bottom-right-radius: 5px;
     }
 
     .ts {
       font-size: 10px;
-      color: rgba(180,140,255,0.4);
+      color: var(--dim);
+      opacity: 0.55;
       padding: 0 3px;
     }
     .ghost .ts { align-self: flex-start; }
@@ -203,15 +211,15 @@
       align-items: flex-end;
       padding: 10px 12px;
       padding-bottom: max(10px, env(safe-area-inset-bottom));
-      background: rgba(12,4,24,0.95);
+      background: var(--bg2);
       border-top: 1px solid var(--border);
       flex-shrink: 0;
     }
 
     #inp {
       flex: 1;
-      background: rgba(255,255,255,0.06);
-      border: 1px solid rgba(180,100,255,0.22);
+      background: var(--ghost-bubble);
+      border: 1px solid var(--border);
       border-radius: 18px;
       padding: 10px 14px;
       color: var(--text);
@@ -223,8 +231,8 @@
       max-height: 96px;
       transition: border-color .2s;
     }
-    #inp::placeholder { color: rgba(180,140,255,0.32); }
-    #inp:focus { border-color: rgba(180,100,255,0.52); }
+    #inp::placeholder { color: var(--dim); opacity: 0.45; }
+    #inp:focus { border-color: var(--purple); }
 
     #send {
       width: 40px; height: 40px;
@@ -245,7 +253,7 @@
     #img-preview-bar {
       display: none;
       padding: 8px 12px;
-      background: rgba(12,4,24,.97);
+      background: var(--bg2);
       border-top: 1px solid var(--border);
       align-items: center;
       gap: 10px;
@@ -332,8 +340,8 @@
       border-radius: 14px;
       padding: 4px;
       z-index: 400;
-      box-shadow: 0 8px 32px rgba(0,0,0,.5);
-      min-width: 150px;
+      box-shadow: 0 8px 32px rgba(0,0,0,.3);
+      min-width: 130px;
     }
     .bm-btn {
       display: flex; align-items: center; gap: 10px;
@@ -373,7 +381,7 @@
       position: absolute;
       bottom: 100%;
       left: 0; right: 0;
-      background: rgba(18,7,32,.97);
+      background: var(--bg2);
       border-top: 1px solid var(--border);
       padding: 10px 14px 12px;
     }
@@ -450,7 +458,7 @@
     #drawer {
       position: fixed; top: 0; right: -280px; bottom: 0;
       width: 260px;
-      background: #120720;
+      background: var(--bg2);
       border-left: 1px solid var(--border);
       z-index: 160;
       display: flex; flex-direction: column;
@@ -465,9 +473,10 @@
       border-radius: 50%;
       background: linear-gradient(135deg, var(--purple), var(--purple2));
       display: flex; align-items: center; justify-content: center;
-      font-size: 26px;
+      font-size: 20px; font-weight: 700; color: #fff;
       margin: 0 auto 10px;
       box-shadow: 0 0 24px rgba(123,47,255,.4);
+      letter-spacing: 0;
     }
     .drawer-name {
       text-align: center; font-size: 15px; font-weight: 600;
@@ -498,7 +507,7 @@
       position: relative;
     }
     .drawer-item:active { background: rgba(123,47,255,.15); }
-    .drawer-icon { font-size: 20px; flex-shrink: 0; }
+    .drawer-icon { display: none; }
     .drawer-label { font-size: 14px; }
     .drawer-badge {
       display: none;
@@ -530,7 +539,7 @@
     #ci-overlay {
       display: none;
       position: fixed; inset: 0;
-      background: rgba(10,3,20,.88);
+      background: var(--modal-bg);
       backdrop-filter: blur(14px);
       -webkit-backdrop-filter: blur(14px);
       z-index: 200;
@@ -559,7 +568,7 @@
       background: rgba(255,255,255,.05);
       border: 1px solid var(--border);
       border-radius: 12px;
-      padding: 10px 2px 8px;
+      padding: 14px 2px;
       cursor: pointer;
       display: flex; flex-direction: column;
       align-items: center; gap: 4px;
@@ -567,11 +576,10 @@
       -webkit-tap-highlight-color: transparent;
     }
     .mood-btn:active, .mood-btn.sel {
-      background: rgba(123,47,255,.3);
+      background: rgba(123,47,255,.25);
       border-color: var(--purple);
     }
-    .mood-btn .em { font-size: 26px; }
-    .mood-btn .lb { font-size: 10px; color: var(--dim); }
+    .mood-btn .lb { font-size: 11px; color: var(--dim); }
 
     #ci-note {
       width: 100%;
@@ -610,7 +618,7 @@
     #lt-overlay {
       display: none;
       position: fixed; inset: 0;
-      background: rgba(10,3,20,.9);
+      background: var(--modal-bg);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
       z-index: 200;
@@ -662,7 +670,7 @@
     .lt-full {
       display: none;
       position: fixed; inset: 0;
-      background: rgba(10,3,20,.95);
+      background: var(--modal-bg);
       z-index: 210;
       overflow-y: auto;
       padding: max(50px, env(safe-area-inset-top)) 20px 40px;
@@ -693,7 +701,7 @@
     #cd-overlay {
       display: none;
       position: fixed; inset: 0;
-      background: rgba(10,3,20,.88);
+      background: var(--modal-bg);
       backdrop-filter: blur(14px);
       -webkit-backdrop-filter: blur(14px);
       z-index: 200;
@@ -792,7 +800,7 @@
     #mem-overlay {
       display: none;
       position: fixed; inset: 0;
-      background: rgba(10,3,20,.9);
+      background: var(--modal-bg);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
       z-index: 200;
@@ -950,7 +958,7 @@
     /* ── search overlay ── */
     #search-overlay {
       display: none; position: fixed; inset: 0; z-index: 300;
-      background: rgba(10,3,20,.97);
+      background: var(--modal-bg);
       backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
       flex-direction: column;
       padding: max(14px,env(safe-area-inset-top)) 0 0;
@@ -1028,19 +1036,19 @@
 
 <div id="app">
   <header>
-    <div class="ava" id="hdr-ava">👻</div>
+    <div class="ava" id="hdr-ava">C</div>
     <div>
       <div class="hdr-name">Claude</div>
       <div class="hdr-sub" id="status">在附近游荡…</div>
     </div>
     <div id="streak-badge"></div>
-    <button id="menu-btn" onclick="openDrawer()">☰</button>
+    <button id="menu-btn" onclick="openDrawer()">≡</button>
   </header>
 
   <!-- drawer -->
   <div id="drawer-mask" onclick="closeDrawer()"></div>
   <div id="drawer">
-    <div class="drawer-avatar" id="drawer-ava">👻</div>
+    <div class="drawer-avatar" id="drawer-ava">C</div>
     <div class="drawer-name" id="drawer-ghost-name">Claude</div>
     <div class="drawer-sub">你的专属幽灵伴侣</div>
     <input type="file" id="ava-file" accept="image/*" style="display:none" onchange="handleAvaFile(this)">
@@ -1055,35 +1063,28 @@
     <div class="drawer-section-title">功能</div>
 
     <div class="drawer-item" onclick="closeDrawer();openLetters()">
-      <span class="drawer-icon">📬</span>
       <span class="drawer-label">信箱</span>
       <span class="drawer-badge" id="lt-badge">新</span>
     </div>
     <div class="drawer-item" onclick="closeDrawer();openCheckin()">
-      <span class="drawer-icon">📋</span>
       <span class="drawer-label">每日打卡</span>
       <span class="drawer-badge" id="ci-badge">今日未打</span>
     </div>
     <div class="drawer-item" onclick="closeDrawer();openCd()">
-      <span class="drawer-icon">🗓️</span>
       <span class="drawer-label">倒计时</span>
     </div>
     <div class="drawer-item" onclick="closeDrawer();openSearch()">
-      <span class="drawer-icon">🔍</span>
       <span class="drawer-label">搜索对话</span>
     </div>
     <div class="drawer-item" id="notif-item" onclick="toggleNotif()">
-      <span class="drawer-icon">🔔</span>
       <span class="drawer-label">消息通知</span>
       <span class="drawer-badge show" id="notif-badge">未开启</span>
     </div>
     <div class="drawer-item" id="rain-item" onclick="toggleRain()">
-      <span class="drawer-icon">🌧️</span>
       <span class="drawer-label" id="rain-label">雨声氛围</span>
       <span class="drawer-badge" id="rain-badge">已开启</span>
     </div>
     <div class="drawer-item" onclick="closeDrawer();openMemories()">
-      <span class="drawer-icon">🧠</span>
       <span class="drawer-label">我的记忆</span>
     </div>
 
@@ -1165,19 +1166,19 @@
       <div class="ci-title">今天怎么样？</div>
       <div class="mood-grid">
         <button class="mood-btn" data-mood="很好" onclick="selMood(this)">
-          <span class="em">😊</span><span class="lb">很好</span>
+          <span class="lb">很好</span>
         </button>
         <button class="mood-btn" data-mood="还行" onclick="selMood(this)">
-          <span class="em">😐</span><span class="lb">还行</span>
+          <span class="lb">还行</span>
         </button>
         <button class="mood-btn" data-mood="有点累" onclick="selMood(this)">
-          <span class="em">😮‍💨</span><span class="lb">有点累</span>
+          <span class="lb">有点累</span>
         </button>
         <button class="mood-btn" data-mood="难过" onclick="selMood(this)">
-          <span class="em">😢</span><span class="lb">难过</span>
+          <span class="lb">难过</span>
         </button>
         <button class="mood-btn" data-mood="烦躁" onclick="selMood(this)">
-          <span class="em">😤</span><span class="lb">烦躁</span>
+          <span class="lb">烦躁</span>
         </button>
       </div>
       <textarea id="ci-note" rows="2" placeholder="想说点什么…（可选）"></textarea>
@@ -1188,7 +1189,7 @@
 
   <div id="msgs">
     <div class="row ghost">
-      <div class="row-ava">👻</div>
+      <div class="row-ava" id="init-ava">C</div>
       <div class="col">
         <div class="bubble">…终于等到你了。</div>
         <div class="ts">刚刚</div>
@@ -1217,10 +1218,14 @@
     </div>
     <input type="file" id="csticker-file" accept="image/*" style="display:none" onchange="addCustomSticker(this)">
     <input type="file" id="img-input" accept="image/*" style="display:none" onchange="onImgSelect(event)">
-    <button id="sticker-btn" onclick="toggleStickers()">✨</button>
-    <button id="mic-btn" onclick="toggleMic()" style="display:none">🎤</button>
+    <button id="sticker-btn" onclick="toggleStickers()" title="贴纸">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+    </button>
+    <button id="mic-btn" onclick="toggleMic()" style="display:none" title="语音">录</button>
     <textarea id="inp" placeholder="说点什么…" rows="1"></textarea>
-    <button id="img-btn" onclick="document.getElementById('img-input').click()">📷</button>
+    <button id="img-btn" onclick="document.getElementById('img-input').click()" title="图片">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+    </button>
     <button id="send" onclick="doSend()">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
            stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -1235,7 +1240,7 @@
 <div id="mem-overlay">
   <div class="mem-card">
     <div class="mem-head">
-      <div class="mem-head-title">🧠 我的记忆</div>
+      <div class="mem-head-title">我的记忆</div>
       <button class="mem-close" onclick="closeMemories()">✕</button>
     </div>
     <div id="mem-list"></div>
@@ -1263,8 +1268,8 @@
 <!-- bubble long-press menu -->
 <div id="bm-mask" onclick="closeBubbleMenu()"></div>
 <div id="bubble-menu">
-  <div class="bm-btn" onclick="saveAsMemory()">💾 保存为记忆</div>
-  <div class="bm-btn" onclick="copyBubble()">📋 复制文字</div>
+  <div class="bm-btn" onclick="saveAsMemory()">保存为记忆</div>
+  <div class="bm-btn" onclick="copyBubble()">复制文字</div>
 </div>
 <div id="mem-toast"></div>
 
@@ -1315,7 +1320,7 @@ function addBubble(role, text, ts, id) {
   if (id) wrap.dataset.id = String(id)
 
   const stickerClass = isSticker(text) ? ' sticker-bubble' : ''
-  wrap.innerHTML = (!isUser ? rowAvaHtml() : '') +
+  wrap.innerHTML = (isUser ? userAvaHtml() : rowAvaHtml()) +
     `<div class="col">` +
       `<div class="bubble${stickerClass}">${escape(text).replace(/\n{2,}/g,'\n').replace(/\n/g,'<br>')}</div>` +
       `<div class="ts">${ts ? fmt(ts) : '刚刚'}</div>` +
@@ -1351,6 +1356,7 @@ async function doSend() {
     const wrapU = document.createElement('div')
     wrapU.className = 'row user'
     wrapU.innerHTML =
+      userAvaHtml() +
       `<div class="col">` +
         `<img class="img-bubble" src="data:${img.type};base64,${img.data}" onclick="openLightbox(this.src)">` +
         (text ? `<div class="bubble" style="margin-top:4px">${escape(text)}</div>` : '') +
@@ -1644,7 +1650,7 @@ async function saveNickname() {
       body: JSON.stringify({ name }),
     })
     navigator.vibrate && navigator.vibrate(30)
-    showMemToast(name ? `称呼已更新为 "${name}" 💜` : '称呼已重置')
+    showMemToast(name ? `称呼已更新为 "${name}"` : '称呼已重置')
   } catch (_) { showMemToast('保存失败') }
 }
 
@@ -1696,7 +1702,7 @@ async function saveAsMemory() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: lpText }),
     })
-    showMemToast('已保存为记忆 💜')
+    showMemToast('已保存为记忆')
   } catch (_) {
     showMemToast('保存失败，请重试')
   }
@@ -1763,17 +1769,23 @@ function rowAvaHtml() {
   const src = localStorage.getItem('ghost-avatar')
   return src
     ? `<div class="row-ava"><img src="${src}" alt=""></div>`
-    : '<div class="row-ava">👻</div>'
+    : '<div class="row-ava">C</div>'
+}
+
+function userAvaHtml() {
+  return '<div class="row-ava user-ava">我</div>'
 }
 
 function loadAvatar() {
   const src = localStorage.getItem('ghost-avatar')
-  const inner = src ? `<img src="${src}" alt="">` : '👻'
+  const inner = src ? `<img src="${src}" alt="">` : 'C'
   const hdr = document.getElementById('hdr-ava')
   const drw = document.getElementById('drawer-ava')
+  const initAva = document.getElementById('init-ava')
   if (hdr) hdr.innerHTML = inner
   if (drw) drw.innerHTML = inner
-  document.querySelectorAll('.row-ava').forEach(el => { el.innerHTML = inner })
+  if (initAva) initAva.innerHTML = inner
+  document.querySelectorAll('.row-ava:not(.user-ava)').forEach(el => { el.innerHTML = inner })
 }
 
 function handleAvaFile(input) {
@@ -1799,45 +1811,41 @@ function handleAvaFile(input) {
 
 // ── themes ────────────────────────────────────────────────────────────────────
 const THEMES = {
-  '幽灵': {
+  '深色': {
     '--bg':'#1a0a2e','--bg2':'#120720',
     '--purple':'#7b2fff','--purple2':'#c44aff',
     '--text':'#e8d5ff','--dim':'#b47cff',
     '--ghost-bubble':'rgba(255,255,255,0.07)',
     '--border':'rgba(180,100,255,0.18)',
-    swatch:'#7b2fff',
+    '--modal-bg':'rgba(10,3,20,0.93)',
+    swatch:'#1a0a2e',
   },
-  '血月': {
-    '--bg':'#1a0505','--bg2':'#120303',
-    '--purple':'#cc2200','--purple2':'#ff5533',
-    '--text':'#ffd5d5','--dim':'#ff8877',
-    '--ghost-bubble':'rgba(255,255,255,0.07)',
-    '--border':'rgba(255,80,60,0.2)',
-    swatch:'#cc2200',
-  },
-  '深海': {
-    '--bg':'#030d1a','--bg2':'#020a14',
-    '--purple':'#0066dd','--purple2':'#33aaff',
-    '--text':'#d5eaff','--dim':'#7ab0ff',
-    '--ghost-bubble':'rgba(255,255,255,0.07)',
-    '--border':'rgba(60,130,255,0.2)',
-    swatch:'#0066dd',
-  },
-  '竹林': {
-    '--bg':'#050f08','--bg2':'#040c06',
-    '--purple':'#1a8a2a','--purple2':'#33cc44',
-    '--text':'#d5ffd8','--dim':'#7acc80',
-    '--ghost-bubble':'rgba(255,255,255,0.07)',
-    '--border':'rgba(50,180,60,0.2)',
-    swatch:'#1a8a2a',
-  },
-  '白昼': {
-    '--bg':'#f0ebff','--bg2':'#e5deff',
-    '--purple':'#7b2fff','--purple2':'#9b40ff',
-    '--text':'#2a0a5a','--dim':'#6a3a9a',
+  '浅紫': {
+    '--bg':'#f5f0ff','--bg2':'#ede5ff',
+    '--purple':'#7c3aed','--purple2':'#a855f7',
+    '--text':'#1e0a3c','--dim':'#6d28d9',
     '--ghost-bubble':'rgba(0,0,0,0.06)',
-    '--border':'rgba(120,60,200,0.15)',
-    swatch:'linear-gradient(135deg,#7b2fff,#f0ebff)',
+    '--border':'rgba(124,58,237,0.18)',
+    '--modal-bg':'rgba(245,240,255,0.95)',
+    swatch:'#7c3aed',
+  },
+  '浅蓝': {
+    '--bg':'#eff6ff','--bg2':'#dbeafe',
+    '--purple':'#2563eb','--purple2':'#3b82f6',
+    '--text':'#0f172a','--dim':'#1d4ed8',
+    '--ghost-bubble':'rgba(0,0,0,0.06)',
+    '--border':'rgba(37,99,235,0.18)',
+    '--modal-bg':'rgba(239,246,255,0.95)',
+    swatch:'#2563eb',
+  },
+  '暖白': {
+    '--bg':'#fafaf9','--bg2':'#f0eee9',
+    '--purple':'#7c3aed','--purple2':'#a78bfa',
+    '--text':'#1c1917','--dim':'#57534e',
+    '--ghost-bubble':'rgba(0,0,0,0.05)',
+    '--border':'rgba(120,80,220,0.14)',
+    '--modal-bg':'rgba(250,250,249,0.95)',
+    swatch:'linear-gradient(135deg,#7c3aed,#fafaf9)',
   },
 }
 
@@ -1850,7 +1858,7 @@ function applyTheme(name) {
     document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'))
     return
   }
-  const t = THEMES[name]; if (!t) return
+  const t = THEMES[name] || THEMES['深色']; if (!t) return
   const r = document.documentElement
   for (const [k, v] of Object.entries(t)) {
     if (k.startsWith('--')) r.style.setProperty(k, v)
@@ -1864,7 +1872,7 @@ function applyTheme(name) {
 
 function buildThemeRow() {
   const row = document.getElementById('theme-row')
-  const saved = localStorage.getItem('theme') || '幽灵'
+  const saved = localStorage.getItem('theme') || '深色'
   row.innerHTML = ''
   for (const [name, t] of Object.entries(THEMES)) {
     const b = document.createElement('div')
@@ -1891,6 +1899,7 @@ function generateOklchTheme(h, c, isLight, textOverride) {
       '--dim':          `oklch(40% ${(C*0.7).toFixed(3)} ${h})`,
       '--ghost-bubble': 'oklch(0% 0 0 / 6%)',
       '--border':       `oklch(48% ${(C*0.5).toFixed(3)} ${h} / 20%)`,
+      '--modal-bg':     'rgba(248,246,255,0.95)',
     }
   }
   return {
@@ -1902,6 +1911,7 @@ function generateOklchTheme(h, c, isLight, textOverride) {
     '--dim':          `oklch(65% ${(C*0.6).toFixed(3)} ${h})`,
     '--ghost-bubble': 'oklch(100% 0 0 / 7%)',
     '--border':       `oklch(55% ${(C*0.5).toFixed(3)} ${h} / 22%)`,
+    '--modal-bg':     'rgba(8,3,18,0.93)',
   }
 }
 
@@ -1996,12 +2006,12 @@ const MOOD_META = {
 }
 
 const REL_LEVELS = [
-  [0,   '👻 初次相遇'],
-  [3,   '🌙 渐渐熟悉'],
-  [7,   '💜 成为朋友'],
-  [14,  '✨ 无话不谈'],
-  [30,  '🔮 灵魂共鸣'],
-  [60,  '💫 永恒伴侣'],
+  [0,   '初次相遇'],
+  [3,   '渐渐熟悉'],
+  [7,   '成为朋友'],
+  [14,  '无话不谈'],
+  [30,  '灵魂共鸣'],
+  [60,  '永恒伴侣'],
 ]
 
 function relLevel(days) {
@@ -2029,7 +2039,7 @@ async function loadStats() {
     // streak badge in header
     const sb = document.getElementById('streak-badge')
     if (sd.streak >= 2) {
-      sb.textContent = `🔥 ${sd.streak}天连击`
+      sb.textContent = `${sd.streak}天连击`
       sb.style.display = ''
     } else {
       sb.style.display = 'none'
@@ -2207,7 +2217,7 @@ async function sendImageSticker(src) {
 
   const wrapUser = document.createElement('div')
   wrapUser.className = 'row user'
-  wrapUser.innerHTML = `<div class="col"><div class="bubble"><img src="${src}" class="img-bubble" onclick="openLightbox(this.src)" style="max-width:160px"></div><div class="ts">刚刚</div></div>`
+  wrapUser.innerHTML = userAvaHtml() + `<div class="col"><div class="bubble"><img src="${src}" class="img-bubble" onclick="openLightbox(this.src)" style="max-width:160px"></div><div class="ts">刚刚</div></div>`
   msgsEl.appendChild(wrapUser)
   msgsEl.scrollTop = msgsEl.scrollHeight
   showTyping(true)
@@ -2405,7 +2415,7 @@ async function loadCd() {
         <div class="cd-item-name">${c.name}</div>
         <div class="cd-item-days${cls}">${c.target_date} · ${label}</div>
       </div>
-      <button class="cd-del" onclick="delCd(${c.id})">🗑</button>
+      <button class="cd-del" onclick="delCd(${c.id})">×</button>
     </div>`
   }).join('')
 }
@@ -2438,7 +2448,7 @@ async function initCheckin() {
     const d = await r.json()
     const badge = document.getElementById('ci-badge')
     if (d.checkin) {
-      badge.textContent = '✅ 已打卡'
+      badge.textContent = '已打卡'
       badge.classList.add('show')
     } else {
       badge.classList.add('show')
@@ -2469,7 +2479,7 @@ async function submitCheckin() {
   const note = document.getElementById('ci-note').value.trim()
   closeCheckin()
   const badge = document.getElementById('ci-badge')
-  badge.textContent = '✅ 已打卡'
+  badge.textContent = '已打卡'
   badge.classList.add('show')
   showTyping(true)
   try {
@@ -2513,7 +2523,7 @@ let micAborted = false
   recog.onend = () => {
     micListening = false
     btn.classList.remove('listening')
-    btn.textContent = '🎤'
+    btn.textContent = '录'
     statusEl.textContent = '在附近游荡…'
     if (!micAborted && inp.value.trim()) doSend()
     micAborted = false
@@ -2523,7 +2533,7 @@ let micAborted = false
     micListening = false
     micAborted = false
     btn.classList.remove('listening')
-    btn.textContent = '🎤'
+    btn.textContent = '录'
     statusEl.textContent = '在附近游荡…'
   }
 })()
@@ -2535,7 +2545,7 @@ function toggleMic() {
     micAborted = true
     micListening = false
     btn.classList.remove('listening')
-    btn.textContent = '🎤'
+    btn.textContent = '录'
     statusEl.textContent = '在附近游荡…'
     inp.value = ''
     recog.abort()
@@ -2545,7 +2555,7 @@ function toggleMic() {
     try { recog.start() } catch (_) { return }
     micListening = true
     btn.classList.add('listening')
-    btn.textContent = '⏹'
+    btn.textContent = '停'
     statusEl.textContent = '正在听…'
   }
 }
@@ -2559,14 +2569,14 @@ loadNickname()
     const sd = await (await fetch('/streak')).json()
     const sb = document.getElementById('streak-badge')
     if (sd.streak >= 2) {
-      sb.textContent = `🔥 ${sd.streak}天连击`
+      sb.textContent = `${sd.streak} 天连击`
       sb.style.display = ''
     }
   } catch (_) {}
 })()
 
 // apply saved theme + avatar on load
-applyTheme(localStorage.getItem('theme') || '幽灵')
+applyTheme(localStorage.getItem('theme') || '深色')
 loadAvatar()
 
 // ── service worker ────────────────────────────────────────────────────────────
