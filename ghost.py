@@ -311,6 +311,11 @@ async def icon():
     from fastapi.responses import Response
     return Response(content=ICON_SVG, media_type="image/svg+xml")
 
+@app.get("/favicon.ico")
+async def favicon():
+    from fastapi.responses import Response
+    return Response(content=ICON_SVG, media_type="image/svg+xml")
+
 
 @app.get("/letters")
 async def list_letters():

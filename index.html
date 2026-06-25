@@ -204,6 +204,55 @@
     }
     #send:active { transform: scale(.91); opacity: .82; }
 
+    #sticker-btn {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.05);
+      font-size: 18px;
+      cursor: pointer;
+      flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      -webkit-tap-highlight-color: transparent;
+      transition: background .15s;
+    }
+    #sticker-btn:active { background: rgba(123,47,255,.25); }
+
+    #sticker-tray {
+      display: none;
+      position: absolute;
+      bottom: 100%;
+      left: 0; right: 0;
+      background: rgba(18,7,32,.97);
+      border-top: 1px solid var(--border);
+      padding: 12px 14px;
+    }
+    #sticker-tray.show { display: block; }
+    .sticker-grid {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      gap: 6px;
+    }
+    .sticker-item {
+      font-size: 26px;
+      text-align: center;
+      cursor: pointer;
+      padding: 4px 0;
+      border-radius: 8px;
+      transition: background .1s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .sticker-item:active { background: rgba(123,47,255,.3); }
+
+    /* big sticker bubble */
+    .bubble.sticker-bubble {
+      background: transparent !important;
+      border: none !important;
+      font-size: 52px;
+      padding: 2px 6px;
+      line-height: 1.1;
+    }
+
     /* ── check-in ── */
     #ci-btn {
       margin-left: auto;
@@ -591,7 +640,11 @@
     <span class="dot"></span><span class="dot"></span><span class="dot"></span>
   </div>
 
-  <footer>
+  <footer style="position:relative">
+    <div id="sticker-tray">
+      <div class="sticker-grid" id="sticker-grid"></div>
+    </div>
+    <button id="sticker-btn" onclick="toggleStickers()">✨</button>
     <textarea id="inp" placeholder="说点什么…" rows="1"></textarea>
     <button id="send" onclick="doSend()">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
@@ -649,9 +702,10 @@ function addBubble(role, text, ts, id) {
   wrap.className = `row ${isUser ? 'user' : 'ghost'}`
   if (id) wrap.dataset.id = String(id)
 
+  const stickerClass = isSticker(text) ? ' sticker-bubble' : ''
   wrap.innerHTML = (!isUser ? '<div class="row-ava">👻</div>' : '') +
     `<div class="col">` +
-      `<div class="bubble">${escape(text).replace(/\n/g,'<br>')}</div>` +
+      `<div class="bubble${stickerClass}">${escape(text).replace(/\n/g,'<br>')}</div>` +
       `<div class="ts">${ts ? fmt(ts) : '刚刚'}</div>` +
     `</div>`
 
@@ -772,6 +826,92 @@ document.addEventListener('visibilitychange', () => {
   report(document.hidden ? '切出页面' : '回到页面')
 })
 report('打开聊天')
+
+// ── stickers ──────────────────────────────────────────────────────────────────
+const STICKERS = [
+  '👻','💜','🌙','⭐','✨','💫','🔮','😈',
+  '🥺','😏','😊','😢','😤','🫶','🤍','💀',
+  '🦋','🌸','🌿','🍃','🖤','🌑','🌫️','🫧',
+]
+
+;(function initStickers() {
+  const grid = document.getElementById('sticker-grid')
+  grid.innerHTML = STICKERS.map(s =>
+    `<div class="sticker-item" onclick="sendSticker('${s}')">${s}</div>`
+  ).join('')
+})()
+
+function toggleStickers() {
+  document.getElementById('sticker-tray').classList.toggle('show')
+}
+
+function isSticker(text) {
+  const trimmed = text.trim()
+  const segmenter = typeof Intl !== 'undefined' && Intl.Segmenter
+    ? new Intl.Segmenter().segment(trimmed)
+    : null
+  if (segmenter) {
+    const segs = [...segmenter].filter(s => s.segment.trim())
+    return segs.length <= 2 && /\p{Emoji}/u.test(trimmed)
+  }
+  return trimmed.length <= 4 && /\p{Emoji}/u.test(trimmed)
+}
+
+async function sendSticker(emoji) {
+  document.getElementById('sticker-tray').classList.remove('show')
+  if (busy) return
+  busy = true
+  statusEl.textContent = '正在回应…'
+
+  addBubble('user', emoji, Date.now() / 1000, null)
+  showTyping(true)
+
+  try {
+    const r = await fetch('/chat/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: emoji }),
+    })
+    showTyping(false)
+    const wrapEl = document.createElement('div')
+    wrapEl.className = 'row ghost'
+    wrapEl.innerHTML = '<div class="row-ava">👻</div>' +
+      '<div class="col"><div class="bubble"></div><div class="ts">刚刚</div></div>'
+    msgsEl.appendChild(wrapEl)
+    const bubbleEl = wrapEl.querySelector('.bubble')
+    let fullText = ''
+    const reader = r.body.getReader()
+    const decoder = new TextDecoder()
+    let buf = ''
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buf += decoder.decode(value, { stream: true })
+      const lines = buf.split('\n'); buf = lines.pop()
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue
+        try {
+          const ev = JSON.parse(line.slice(6))
+          if (ev.t) {
+            fullText += ev.t
+            bubbleEl.textContent = fullText
+            if (isSticker(fullText)) bubbleEl.classList.add('sticker-bubble')
+            else bubbleEl.classList.remove('sticker-bubble')
+            msgsEl.scrollTop = msgsEl.scrollHeight
+          }
+          if (ev.done && ev.id) {
+            wrapEl.dataset.id = String(ev.id)
+            if (ev.id > latestId) latestId = ev.id
+          }
+        } catch (_) {}
+      }
+    }
+    statusEl.textContent = '在附近游荡…'
+  } catch (_) {
+    showTyping(false)
+  }
+  busy = false
+}
 
 // ── letters ───────────────────────────────────────────────────────────────────
 let lastSeenLetterId = +localStorage.getItem('lastSeenLetter') || 0
