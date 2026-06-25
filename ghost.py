@@ -332,9 +332,9 @@ async def checkin(req: Request):
         )
         conn.commit()
 
-    extra = f"，她还说：{note}" if note else ""
+    extra = f'，她还说：{note}' if note else ''
     reply = await call_ai(
-        f"沐鱼今天打卡了，心情是"{mood}"{extra}。给她一个简短回应，温柔关心，不超过2句。",
+        f'沐鱼今天打卡了，心情是"{mood}"{extra}。给她一个简短回应，温柔关心，不超过2句。',
         max_hist=4,
     )
     m = push_msg("assistant", reply)
