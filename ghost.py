@@ -577,10 +577,31 @@ async def chat_stream(req: Request):
     if not text:
         return JSONResponse({"error": "empty"}, status_code=400)
 
+    image = body.get("image")   # {"data": base64str, "type": "image/jpeg"}
+    if not text and not image:
+        return JSONResponse({"error": "empty"}, status_code=400)
+
     last_user_ts = time.time()
-    # 先建上下文（此时 user 消息未入库，不会重复）
-    system_parts, api_msgs = await _build_context(text)
-    push_msg("user", text)
+    display_text = text or "[图片]"
+    # 建上下文时用文字占位，之后替换最后一条 user message
+    system_parts, api_msgs = await _build_context(display_text)
+
+    if image and image.get("data"):
+        img_content: list = [{
+            "type": "image",
+            "source": {
+                "type": "base64",
+                "media_type": image.get("type", "image/jpeg"),
+                "data": image["data"],
+            },
+        }]
+        if text:
+            img_content.append({"type": "text", "text": text})
+        else:
+            img_content.append({"type": "text", "text": "（她发了一张图片给你）"})
+        api_msgs[-1] = {"role": "user", "content": img_content}
+
+    push_msg("user", display_text)
     headers = {**ANTHROPIC_HEADERS, "x-api-key": API_KEY}
 
     async def generate():
