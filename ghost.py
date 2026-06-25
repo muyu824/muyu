@@ -152,6 +152,33 @@ async def _build_context(prompt: str, max_hist: int = 20):
         {"type": "text", "text": static_text, "cache_control": {"type": "ephemeral"}}
     ]
 
+    # 动态块：关系阶段（根据相识天数调整亲密度提示）
+    try:
+        with get_db() as conn:
+            active_days = conn.execute(
+                "SELECT COUNT(DISTINCT date(ts + 8*3600, 'unixepoch')) "
+                "FROM messages WHERE role='user'"
+            ).fetchone()[0]
+        _stages = [
+            (60, "永恒伴侣，你们灵魂相通，你说话极尽亲密，偶尔撒娇，毫无距离"),
+            (30, "灵魂共鸣的挚友，你们已非常默契，说话自然亲密、随意玩笑"),
+            (14, "无话不谈的朋友，你们互相了解，语气温柔随性、偶尔小调皮"),
+            (7,  "越来越熟的朋友，你稍显放松，言语中透出一丝亲近"),
+            (3,  "逐渐熟悉中，你还保留着一点神秘感，但态度友好温和"),
+            (0,  "初次相遇，你神秘内敛，礼貌却带点距离"),
+        ]
+        stage_desc = _stages[-1][1]
+        for threshold, desc in _stages:
+            if active_days >= threshold:
+                stage_desc = desc
+                break
+        system_parts.append({
+            "type": "text",
+            "text": f"【关系阶段】你和muyu已相识 {active_days} 天，{stage_desc}。"
+        })
+    except Exception:
+        pass
+
     # 动态块：历史摘要（压缩后的早期对话，不缓存）
     with get_db() as conn:
         summary_rows = conn.execute(

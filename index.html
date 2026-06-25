@@ -1465,6 +1465,20 @@ function closeDrawer() {
   document.getElementById('drawer-mask').classList.remove('show')
 }
 
+// swipe-right to open drawer
+;(function initSwipe() {
+  let sx = 0, sy = 0
+  document.addEventListener('touchstart', e => {
+    sx = e.touches[0].clientX
+    sy = e.touches[0].clientY
+  }, { passive: true })
+  document.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - sx
+    const dy = Math.abs(e.changedTouches[0].clientY - sy)
+    if (dx > 55 && dy < 45 && sx < 30) openDrawer()
+  }, { passive: true })
+})()
+
 const MOOD_META = {
   '很好':  { em: '😊', color: '#3dba5e' },
   '还行':  { em: '😐', color: '#c8b820' },
