@@ -78,7 +78,7 @@ async def call_ai(prompt, max_hist=20):
             r.raise_for_status()
             return r.json()["choices"][0]["message"]["content"].strip()
     except Exception as e:
-        return f"…（{e}）"
+        return f"error: {str(e)}"
 
 
 async def send_ntfy(text):
