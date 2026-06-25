@@ -640,6 +640,11 @@
       <span class="drawer-icon">🗓️</span>
       <span class="drawer-label">倒计时</span>
     </div>
+    <div class="drawer-item" id="notif-item" onclick="toggleNotif()">
+      <span class="drawer-icon">🔔</span>
+      <span class="drawer-label">消息通知</span>
+      <span class="drawer-badge show" id="notif-badge">未开启</span>
+    </div>
 
     <div class="drawer-divider"></div>
     <div class="drawer-section-title">数据</div>
@@ -910,6 +915,65 @@ document.addEventListener('visibilitychange', () => {
   report(document.hidden ? '切出页面' : '回到页面')
 })
 report('打开聊天')
+
+// ── web push ──────────────────────────────────────────────────────────────────
+async function initNotif() {
+  if (!('Notification' in window) || !('serviceWorker' in navigator)) return
+  const badge = document.getElementById('notif-badge')
+  if (Notification.permission === 'granted') {
+    const reg = await navigator.serviceWorker.ready
+    const sub = await reg.pushManager.getSubscription()
+    if (sub) { badge.textContent = '已开启'; badge.style.background = '#2d9e5f'; return }
+  }
+  if (Notification.permission === 'denied') { badge.textContent = '已拒绝'; return }
+}
+
+async function toggleNotif() {
+  if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+    alert('当前浏览器不支持推送通知'); return
+  }
+  const badge = document.getElementById('notif-badge')
+  const reg = await navigator.serviceWorker.ready
+  const existing = await reg.pushManager.getSubscription()
+
+  if (existing) {
+    // 已订阅 → 取消
+    await fetch('/push/unsubscribe', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ endpoint: existing.endpoint }),
+    })
+    await existing.unsubscribe()
+    badge.textContent = '未开启'; badge.style.background = ''
+    return
+  }
+
+  // 申请权限
+  const perm = await Notification.requestPermission()
+  if (perm !== 'granted') { badge.textContent = '已拒绝'; return }
+
+  // 获取 VAPID 公钥
+  const kRes = await fetch('/push/vapid-public-key')
+  const { publicKey } = await kRes.json()
+
+  // 订阅
+  const sub = await reg.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: _urlB64ToUint8(publicKey),
+  })
+  await fetch('/push/subscribe', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(sub.toJSON()),
+  })
+  badge.textContent = '已开启'; badge.style.background = '#2d9e5f'
+}
+
+function _urlB64ToUint8(b64) {
+  const pad = '='.repeat((4 - b64.length % 4) % 4)
+  const raw = atob((b64 + pad).replace(/-/g, '+').replace(/_/g, '/'))
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)))
+}
+
+initNotif()
 
 // ── drawer ────────────────────────────────────────────────────────────────────
 function openDrawer() {

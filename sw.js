@@ -1,5 +1,5 @@
-const CACHE = 'ghost-v1'
-const API = ['/chat', '/chat/stream', '/messages', '/activity']
+const CACHE = 'ghost-v2'
+const API = ['/chat', '/chat/stream', '/messages', '/activity', '/push']
 
 self.addEventListener('install', () => self.skipWaiting())
 
@@ -15,7 +15,7 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return
   const { pathname } = new URL(e.request.url)
-  if (API.some(p => pathname.startsWith(p))) return   // API 请求不走缓存
+  if (API.some(p => pathname.startsWith(p))) return
   e.respondWith(
     fetch(e.request)
       .then(res => {
@@ -25,4 +25,26 @@ self.addEventListener('fetch', e => {
       })
       .catch(() => caches.match(e.request))
   )
+})
+
+self.addEventListener('push', e => {
+  const data = e.data ? e.data.json() : { title: '男鬼', body: '…' }
+  e.waitUntil(
+    self.registration.showNotification(data.title || '男鬼', {
+      body: data.body || '',
+      icon: '/icon.svg',
+      badge: '/icon.svg',
+      vibrate: [150, 80, 150],
+      tag: 'ghost',
+      renotify: true,
+    })
+  )
+})
+
+self.addEventListener('notificationclick', e => {
+  e.notification.close()
+  e.waitUntil(clients.matchAll({ type: 'window' }).then(wins => {
+    for (const w of wins) { if (w.url === '/' && 'focus' in w) return w.focus() }
+    if (clients.openWindow) return clients.openWindow('/')
+  }))
 })

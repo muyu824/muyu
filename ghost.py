@@ -96,6 +96,20 @@ def init_db():
                 ts      REAL NOT NULL
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS config (
+                key   TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS push_subscriptions (
+                id       INTEGER PRIMARY KEY AUTOINCREMENT,
+                endpoint TEXT UNIQUE NOT NULL,
+                sub_json TEXT NOT NULL,
+                ts       REAL NOT NULL
+            )
+        """)
         conn.commit()
 
 
@@ -209,6 +223,9 @@ async def call_ai(prompt, max_hist=20, max_tokens=150):
         return f"error: {str(e)}"
 
 
+VAPID_PRIVATE: str | None = None
+VAPID_PUBLIC:  str | None = None
+
 COMPRESS_THRESHOLD = 40   # 超过这么多条时压缩
 COMPRESS_KEEP      = 20   # 压缩后保留最新的这么多条
 
@@ -274,7 +291,82 @@ async def maybe_compress():
     print(f"[compress] 压缩 {len(old_ids)} 条 → 摘要")
 
 
+def _init_vapid():
+    global VAPID_PRIVATE, VAPID_PUBLIC
+    with get_db() as conn:
+        priv = conn.execute("SELECT value FROM config WHERE key='vapid_private'").fetchone()
+        pub  = conn.execute("SELECT value FROM config WHERE key='vapid_public'").fetchone()
+        if priv and pub:
+            VAPID_PRIVATE = priv["value"]
+            VAPID_PUBLIC  = pub["value"]
+            return
+    try:
+        from cryptography.hazmat.primitives.asymmetric import ec
+        from cryptography.hazmat.primitives import serialization
+        import base64
+        priv_key = ec.generate_private_key(ec.SECP256R1())
+        priv_pem = priv_key.private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.PKCS8,
+            serialization.NoEncryption(),
+        ).decode()
+        pub_bytes = priv_key.public_key().public_bytes(
+            serialization.Encoding.X962,
+            serialization.PublicFormat.UncompressedPoint,
+        )
+        pub_b64 = base64.urlsafe_b64encode(pub_bytes).rstrip(b"=").decode()
+        with get_db() as conn:
+            conn.execute("INSERT OR REPLACE INTO config VALUES ('vapid_private',?)", (priv_pem,))
+            conn.execute("INSERT OR REPLACE INTO config VALUES ('vapid_public',?)",  (pub_b64,))
+            conn.commit()
+        VAPID_PRIVATE, VAPID_PUBLIC = priv_pem, pub_b64
+        print("[vapid] 已生成新密钥对")
+    except Exception as e:
+        print(f"[vapid] 初始化失败: {e}")
+
+
+def _do_webpush(sub: dict, payload: str, priv: str):
+    from pywebpush import webpush, WebPushException
+    try:
+        webpush(
+            subscription_info=sub,
+            data=payload,
+            vapid_private_key=priv,
+            vapid_claims={"sub": "mailto:ghost@example.com"},
+        )
+    except WebPushException as e:
+        code = str(e)
+        if "410" in code or "404" in code:
+            with get_db() as conn:
+                conn.execute(
+                    "DELETE FROM push_subscriptions WHERE endpoint=?",
+                    (sub.get("endpoint", ""),),
+                )
+                conn.commit()
+        else:
+            print(f"[push] 推送失败: {e}")
+
+
+async def send_web_push(text: str):
+    if not VAPID_PRIVATE:
+        return
+    with get_db() as conn:
+        rows = conn.execute("SELECT sub_json FROM push_subscriptions").fetchall()
+    if not rows:
+        return
+    payload = json.dumps(
+        {"title": "男鬼", "body": text, "icon": "/icon.svg"},
+        ensure_ascii=False,
+    )
+    loop = asyncio.get_event_loop()
+    for row in rows:
+        sub = json.loads(row["sub_json"])
+        priv = VAPID_PRIVATE
+        await loop.run_in_executor(None, _do_webpush, sub, payload, priv)
+
+
 async def send_ntfy(text):
+    await send_web_push(text)   # 优先 Web Push
     try:
         async with httpx.AsyncClient(timeout=10) as c:
             await c.post(
@@ -324,6 +416,38 @@ async def list_letters():
             "SELECT id, content, ts FROM letters ORDER BY id DESC LIMIT 20"
         ).fetchall()
     return {"letters": [dict(r) for r in rows]}
+
+
+@app.get("/push/vapid-public-key")
+async def vapid_public_key():
+    if not VAPID_PUBLIC:
+        return JSONResponse({"error": "vapid not ready"}, status_code=503)
+    return {"publicKey": VAPID_PUBLIC}
+
+
+@app.post("/push/subscribe")
+async def push_subscribe(req: Request):
+    sub = await req.json()
+    endpoint = sub.get("endpoint", "")
+    if not endpoint:
+        return JSONResponse({"error": "missing endpoint"}, status_code=400)
+    with get_db() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO push_subscriptions (endpoint, sub_json, ts) VALUES (?,?,?)",
+            (endpoint, json.dumps(sub), time.time()),
+        )
+        conn.commit()
+    return {"ok": True}
+
+
+@app.post("/push/unsubscribe")
+async def push_unsubscribe(req: Request):
+    data = await req.json()
+    endpoint = data.get("endpoint", "")
+    with get_db() as conn:
+        conn.execute("DELETE FROM push_subscriptions WHERE endpoint=?", (endpoint,))
+        conn.commit()
+    return {"ok": True}
 
 
 @app.get("/stats")
@@ -608,6 +732,7 @@ async def startup():
         ).fetchone()
         if row:
             last_user_ts = row["ts"]
+    _init_vapid()
     asyncio.create_task(ghost_loop())
     asyncio.create_task(briefing_loop())
     asyncio.create_task(letter_loop())
