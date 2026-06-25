@@ -72,7 +72,7 @@ async def call_ai(prompt, max_hist=20):
         async with httpx.AsyncClient(timeout=30) as c:
             r = await c.post(
                 "https://openrouter.ai/api/v1/chat/completions",
-                headers={"Authorization": f"Bearer {API_KEY}", "X-Title": "男鬼"},
+                headers={"Authorization": f"Bearer {API_KEY}", "X-Title": "ghost"},
                 json={"model": MODEL, "messages": api_msgs, "max_tokens": 150},
             )
             r.raise_for_status()
