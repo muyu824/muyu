@@ -18,9 +18,9 @@ app.add_middleware(
 )
 
 # ── config ────────────────────────────────────────────────────────────────────
-API_KEY  = os.environ.get("OPENROUTER_API_KEY", "")
+API_KEY  = os.environ.get("ANTHROPIC_API_KEY", "")
 NTFY_URL = "https://ntfy.sh/claude-muyu-lovestory-624"
-MODEL    = "anthropic/claude-sonnet-4.6"
+MODEL    = "claude-sonnet-4-6"
 BASE_DIR = Path(__file__).parent
 DB_PATH  = Path("/data/ghost.db")
 
@@ -80,7 +80,7 @@ def push_msg(role, content):
 # ── helpers ───────────────────────────────────────────────────────────────────
 async def call_ai(prompt, max_hist=20):
     if not API_KEY:
-        return "…（未配置 OPENROUTER_API_KEY）"
+        return "…（未配置 ANTHROPIC_API_KEY）"
 
     system = PERSONA
 
@@ -117,7 +117,7 @@ async def call_ai(prompt, max_hist=20):
         ).fetchall()
     history = list(reversed(hist_rows))
 
-    api_msgs = [{"role": "system", "content": system}]
+    api_msgs = []
     for r in history:
         api_msgs.append({"role": r["role"], "content": r["content"]})
     api_msgs.append({"role": "user", "content": prompt})
@@ -125,12 +125,16 @@ async def call_ai(prompt, max_hist=20):
     try:
         async with httpx.AsyncClient(timeout=30) as c:
             r = await c.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers={"Authorization": f"Bearer {API_KEY}", "X-Title": "ghost"},
-                json={"model": MODEL, "messages": api_msgs, "max_tokens": 150},
+                "https://api.anthropic.com/v1/messages",
+                headers={
+                    "x-api-key": API_KEY,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json",
+                },
+                json={"model": MODEL, "system": system, "messages": api_msgs, "max_tokens": 150},
             )
             r.raise_for_status()
-            return r.json()["choices"][0]["message"]["content"].strip()
+            return r.json()["content"][0]["text"].strip()
     except Exception as e:
         return f"error: {str(e)}"
 
