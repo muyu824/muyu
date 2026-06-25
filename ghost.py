@@ -469,6 +469,35 @@ async def stats():
     return {"messages": msgs, "checkins": checks, "letters": letts, "days": days}
 
 
+@app.get("/streak")
+async def get_streak():
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT DISTINCT date(ts + 8*3600, 'unixepoch') as d "
+            "FROM messages WHERE role='user' ORDER BY d DESC"
+        ).fetchall()
+    dates = [r[0] for r in rows]
+    if not dates:
+        return {"streak": 0, "total": 0}
+
+    cst_now = time.time() + 8 * 3600
+    today = time.strftime("%Y-%m-%d", time.gmtime(cst_now))
+    yesterday = time.strftime("%Y-%m-%d", time.gmtime(cst_now - 86400))
+
+    streak = 0
+    if dates[0] in (today, yesterday):
+        from datetime import date as dt, timedelta as td
+        cur = dt.fromisoformat(dates[0])
+        for d in dates:
+            if d == cur.isoformat():
+                streak += 1
+                cur -= td(days=1)
+            else:
+                break
+
+    return {"streak": streak, "total": len(dates)}
+
+
 @app.get("/memories")
 async def list_memories():
     with get_db() as conn:

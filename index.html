@@ -71,6 +71,31 @@
     .hdr-name { font-size: 15px; font-weight: 600; letter-spacing: .3px; }
     .hdr-sub  { font-size: 11px; color: var(--dim); margin-top: 2px; }
 
+    #streak-badge {
+      display: none;
+      margin-left: auto;
+      margin-right: 6px;
+      background: rgba(255,160,0,.15);
+      border: 1px solid rgba(255,160,0,.3);
+      border-radius: 20px;
+      padding: 4px 10px;
+      font-size: 12px;
+      color: #ffb020;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .rel-badge {
+      display: inline-block;
+      background: linear-gradient(90deg, var(--purple), var(--purple2));
+      border-radius: 16px;
+      padding: 5px 14px;
+      font-size: 12px;
+      color: #fff;
+      margin: 0 16px 14px;
+      text-align: center;
+    }
+
     /* ── messages ── */
     #msgs {
       flex: 1;
@@ -821,6 +846,7 @@
       <div class="hdr-name">男鬼</div>
       <div class="hdr-sub" id="status">在附近游荡…</div>
     </div>
+    <div id="streak-badge"></div>
     <button id="menu-btn" onclick="openDrawer()">☰</button>
   </header>
 
@@ -864,6 +890,7 @@
 
     <div class="drawer-divider"></div>
     <div class="drawer-section-title">数据</div>
+    <div id="rel-badge" class="rel-badge" style="display:none"></div>
     <div class="stats-grid" id="stats-grid">
       <div class="stat-box"><div class="stat-num" id="s-msgs">…</div><div class="stat-lbl">条消息</div></div>
       <div class="stat-box"><div class="stat-num" id="s-days">…</div><div class="stat-lbl">活跃天数</div></div>
@@ -1446,16 +1473,51 @@ const MOOD_META = {
   '烦躁':  { em: '😤', color: '#dd4444' },
 }
 
+const REL_LEVELS = [
+  [0,   '👻 初次相遇'],
+  [3,   '🌙 渐渐熟悉'],
+  [7,   '💜 成为朋友'],
+  [14,  '✨ 无话不谈'],
+  [30,  '🔮 灵魂共鸣'],
+  [60,  '💫 永恒伴侣'],
+]
+
+function relLevel(days) {
+  let label = REL_LEVELS[0][1]
+  for (const [d, l] of REL_LEVELS) {
+    if (days >= d) label = l
+  }
+  return label
+}
+
 async function loadStats() {
   try {
-    const [sr, cr] = await Promise.all([fetch('/stats'), fetch('/checkins?limit=30')])
-    const d = await sr.json()
+    const [sr, cr, strr] = await Promise.all([
+      fetch('/stats'), fetch('/checkins?limit=30'), fetch('/streak')
+    ])
+    const d  = await sr.json()
+    const cd = await cr.json()
+    const sd = await strr.json()
+
     document.getElementById('s-msgs').textContent   = d.messages
     document.getElementById('s-days').textContent   = d.days
     document.getElementById('s-checks').textContent = d.checkins
     document.getElementById('s-letts').textContent  = d.letters
 
-    const cd = await cr.json()
+    // streak badge in header
+    const sb = document.getElementById('streak-badge')
+    if (sd.streak >= 2) {
+      sb.textContent = `🔥 ${sd.streak}天连击`
+      sb.style.display = ''
+    } else {
+      sb.style.display = 'none'
+    }
+
+    // relationship level in drawer
+    const rb = document.getElementById('rel-badge')
+    rb.textContent = `${relLevel(sd.total)}  ·  已相识 ${sd.total} 天`
+    rb.style.display = ''
+
     renderMoodChart(cd.checkins)
   } catch (_) {}
 }
@@ -1839,6 +1901,18 @@ function toggleMic() {
     statusEl.textContent = '正在听…'
   }
 }
+
+// load streak badge on startup
+;(async () => {
+  try {
+    const sd = await (await fetch('/streak')).json()
+    const sb = document.getElementById('streak-badge')
+    if (sd.streak >= 2) {
+      sb.textContent = `🔥 ${sd.streak}天连击`
+      sb.style.display = ''
+    }
+  } catch (_) {}
+})()
 
 // apply saved theme on load
 applyTheme(localStorage.getItem('theme') || '幽灵')
