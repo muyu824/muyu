@@ -3,7 +3,7 @@ services:
     name: ghost
     runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: python ghost.py
+    startCommand: uvicorn ghost:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: OPENROUTER_API_KEY
         sync: false       # 在 Render 控制台手动填写，不写进代码

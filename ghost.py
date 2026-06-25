@@ -8,7 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
 app = FastAPI()
 app.add_middleware(
@@ -95,7 +95,7 @@ BASE_DIR = Path(__file__).parent
 
 @app.get("/")
 async def index():
-    return HTMLResponse((BASE_DIR / "index.html").read_text("utf-8"))
+    return FileResponse(BASE_DIR / "index.html")
 
 
 @app.post("/activity")
