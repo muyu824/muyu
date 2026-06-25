@@ -857,27 +857,64 @@
     .swatch.active { border-color: #fff; transform: scale(1.15); }
     .swatch:active { transform: scale(.9); }
 
-    /* custom color picker */
-    .cp-row {
-      display: flex; gap: 14px; padding: 4px 20px 14px;
-      align-items: flex-end; flex-wrap: wrap;
+    /* ── ColorSpace custom picker ── */
+    .cp-row { padding: 0 20px 14px; }
+    .cp-full { margin-bottom: 12px; }
+    .cp-label {
+      display: flex; justify-content: space-between;
+      font-size: 10px; color: var(--dim); margin-bottom: 6px;
     }
-    .cp-item {
-      display: flex; flex-direction: column; align-items: center; gap: 4px;
+    .cp-slider {
+      -webkit-appearance: none; appearance: none;
+      width: 100%; height: 4px; border-radius: 2px;
+      outline: none; cursor: pointer;
+    }
+    .cp-hue-sl {
+      background: linear-gradient(to right,
+        oklch(65% .22 0),oklch(65% .22 60),oklch(65% .22 120),
+        oklch(65% .22 180),oklch(65% .22 240),oklch(65% .22 300),oklch(65% .22 360));
+    }
+    .cp-chr-sl { background: var(--border); }
+    .cp-slider::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 18px; height: 18px;
+      border-radius: 50%; background: #fff;
+      box-shadow: 0 1px 6px rgba(0,0,0,.5); cursor: pointer;
+    }
+    .cp-bot-row {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    }
+    .cp-font-item {
+      display: flex; flex-direction: column; align-items: center; gap: 3px;
       font-size: 10px; color: var(--dim);
     }
-    .cp-item input[type=color] {
-      width: 36px; height: 36px; border-radius: 50%;
+    .cp-font-item input[type=color] {
+      width: 32px; height: 32px; border-radius: 50%;
       border: 2px solid var(--border); background: none;
       cursor: pointer; padding: 2px;
       -webkit-appearance: none; appearance: none;
     }
+    .cp-light-lbl {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 10px; color: var(--dim); cursor: pointer; user-select: none;
+    }
+    #cp-light { display: none; }
+    .cp-light-knob {
+      position: relative; width: 28px; height: 16px;
+      background: var(--border); border-radius: 8px; transition: background .2s; flex-shrink: 0;
+    }
+    .cp-light-knob::after {
+      content: ''; position: absolute;
+      width: 12px; height: 12px; top: 2px; left: 2px;
+      border-radius: 50%; background: var(--dim); transition: left .2s, background .2s;
+    }
+    #cp-light:checked + .cp-light-knob { background: var(--purple); }
+    #cp-light:checked + .cp-light-knob::after { left: 14px; background: #fff; }
     .cp-apply {
-      flex: 1; min-width: 60px;
+      flex: 1; min-width: 50px;
       background: none; border: 1px solid var(--border);
       color: var(--dim); font-size: 11px;
       padding: 7px 10px; border-radius: 8px; cursor: pointer;
-      margin-bottom: 2px; -webkit-tap-highlight-color: transparent;
+      -webkit-tap-highlight-color: transparent;
     }
     .cp-apply:active { opacity: .65; }
 
@@ -1054,19 +1091,26 @@
     <div class="drawer-section-title">主题</div>
     <div class="theme-row" id="theme-row"></div>
     <div class="cp-row">
-      <div class="cp-item">
-        <input type="color" id="cp-accent" title="主色" oninput="liveCustom()">
-        <span>主色</span>
+      <div class="cp-full">
+        <div class="cp-label"><span>色相</span><span id="cp-hue-val">270°</span></div>
+        <input type="range" id="cp-hue" class="cp-slider cp-hue-sl" min="0" max="360" value="270" oninput="liveCustom()">
       </div>
-      <div class="cp-item">
-        <input type="color" id="cp-bg" title="背景" oninput="liveCustom()">
-        <span>背景</span>
+      <div class="cp-full">
+        <div class="cp-label"><span>饱和度</span><span id="cp-chr-val">中</span></div>
+        <input type="range" id="cp-chroma" class="cp-slider cp-chr-sl" min="0" max="35" value="22" oninput="liveCustom()">
       </div>
-      <div class="cp-item">
-        <input type="color" id="cp-text" title="文字" oninput="liveCustom()">
-        <span>文字</span>
+      <div class="cp-bot-row">
+        <div class="cp-font-item">
+          <input type="color" id="cp-font" oninput="liveCustom()">
+          <span>字体</span>
+        </div>
+        <label class="cp-light-lbl">
+          <input type="checkbox" id="cp-light" onchange="liveCustom()">
+          <span class="cp-light-knob"></span>
+          <span>明亮</span>
+        </label>
+        <button class="cp-apply" onclick="saveCustomTheme()">保存配色</button>
       </div>
-      <button class="cp-apply" onclick="saveCustomTheme()">保存配色</button>
     </div>
 
     <div class="drawer-divider"></div>
@@ -1800,7 +1844,8 @@ const THEMES = {
 function applyTheme(name) {
   if (name === '自定义') {
     const cp = JSON.parse(localStorage.getItem('custom-colors') || '{}')
-    if (cp.accent) applyCustomColors(cp.accent, cp.bg || '#1a0a2e', cp.text || '#e8d5ff')
+    if (cp.accent) { localStorage.removeItem('custom-colors'); applyTheme('幽灵'); return }
+    applyCssVars(generateOklchTheme(cp.h ?? 270, cp.c ?? 22, !!cp.light, cp.textColor || null))
     localStorage.setItem('theme', '自定义')
     document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'))
     return
@@ -1833,56 +1878,82 @@ function buildThemeRow() {
   loadCustomColorPickers()
 }
 
-// ── custom colors ────────────────────────────────────────────────────────────
-function hexToRgb(hex) {
-  return [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16))
+// ── ColorSpace oklch custom theme ─────────────────────────────────────────────
+function generateOklchTheme(h, c, isLight, textOverride) {
+  const C = c / 100
+  if (isLight) {
+    return {
+      '--bg':           `oklch(95% ${(C*0.10).toFixed(3)} ${h})`,
+      '--bg2':          `oklch(91% ${(C*0.12).toFixed(3)} ${h})`,
+      '--purple':       `oklch(48% ${C.toFixed(3)} ${h})`,
+      '--purple2':      `oklch(57% ${(C*1.1).toFixed(3)} ${(h+20)%360})`,
+      '--text':          textOverride || `oklch(14% ${(C*0.08).toFixed(3)} ${h})`,
+      '--dim':          `oklch(40% ${(C*0.7).toFixed(3)} ${h})`,
+      '--ghost-bubble': 'oklch(0% 0 0 / 6%)',
+      '--border':       `oklch(48% ${(C*0.5).toFixed(3)} ${h} / 20%)`,
+    }
+  }
+  return {
+    '--bg':           `oklch(10% ${(C*0.08).toFixed(3)} ${h})`,
+    '--bg2':          `oklch(7% ${(C*0.07).toFixed(3)} ${h})`,
+    '--purple':       `oklch(60% ${C.toFixed(3)} ${h})`,
+    '--purple2':      `oklch(70% ${(C*1.1).toFixed(3)} ${(h+20)%360})`,
+    '--text':          textOverride || `oklch(88% ${(C*0.18).toFixed(3)} ${h})`,
+    '--dim':          `oklch(65% ${(C*0.6).toFixed(3)} ${h})`,
+    '--ghost-bubble': 'oklch(100% 0 0 / 7%)',
+    '--border':       `oklch(55% ${(C*0.5).toFixed(3)} ${h} / 22%)`,
+  }
 }
-function lightenHex(hex, t) {
-  return '#' + hexToRgb(hex).map(v => Math.round(v + (255 - v) * t).toString(16).padStart(2, '0')).join('')
+
+function applyCssVars(vars) {
+  const r = document.documentElement
+  for (const [k, v] of Object.entries(vars)) r.style.setProperty(k, v)
 }
-function darkenHex(hex, t) {
-  return '#' + hexToRgb(hex).map(v => Math.round(v * (1 - t)).toString(16).padStart(2, '0')).join('')
+
+function updateCpLabels() {
+  const hueEl = document.getElementById('cp-hue')
+  const chrEl = document.getElementById('cp-chroma')
+  const hueVal = document.getElementById('cp-hue-val')
+  const chrVal = document.getElementById('cp-chr-val')
+  if (hueEl && hueVal) hueVal.textContent = hueEl.value + '°'
+  if (chrEl && chrVal) {
+    const c = +chrEl.value
+    chrVal.textContent = c < 8 ? '极淡' : c < 15 ? '淡' : c < 22 ? '中' : c < 30 ? '浓' : '极浓'
+  }
 }
 
 function loadCustomColorPickers() {
   const cp = JSON.parse(localStorage.getItem('custom-colors') || '{}')
-  const a = document.getElementById('cp-accent')
-  const b = document.getElementById('cp-bg')
-  const tx = document.getElementById('cp-text')
-  if (a) a.value = cp.accent || '#7b2fff'
-  if (b) b.value = cp.bg || '#1a0a2e'
-  if (tx) tx.value = cp.text || '#e8d5ff'
-}
-
-function applyCustomColors(accent, bg, text) {
-  const r = document.documentElement
-  r.style.setProperty('--purple', accent)
-  r.style.setProperty('--purple2', lightenHex(accent, 0.35))
-  r.style.setProperty('--bg', bg)
-  r.style.setProperty('--bg2', darkenHex(bg, 0.3))
-  r.style.setProperty('--text', text)
-  const [ra, ga, ba] = hexToRgb(accent)
-  r.style.setProperty('--dim', `rgba(${ra},${ga},${ba},0.75)`)
-  r.style.setProperty('--ghost-bubble', 'rgba(255,255,255,0.07)')
-  r.style.setProperty('--border', `rgba(${ra},${ga},${ba},0.25)`)
-  const tc = document.querySelector('meta[name="theme-color"]')
-  if (tc) tc.content = bg
+  if (cp.accent) { localStorage.removeItem('custom-colors'); return }  // migrate old hex format
+  const hue = document.getElementById('cp-hue')
+  const chr = document.getElementById('cp-chroma')
+  const light = document.getElementById('cp-light')
+  const font = document.getElementById('cp-font')
+  if (hue)  hue.value   = cp.h   ?? 270
+  if (chr)  chr.value   = cp.c   ?? 22
+  if (light) light.checked = !!(cp.light)
+  if (font) font.value  = cp.textColor || '#e8d5ff'
+  updateCpLabels()
 }
 
 function liveCustom() {
-  const a = document.getElementById('cp-accent').value
-  const bg = document.getElementById('cp-bg').value
-  const tx = document.getElementById('cp-text').value
-  applyCustomColors(a, bg, tx)
+  updateCpLabels()
+  const h  = +(document.getElementById('cp-hue').value)
+  const c  = +(document.getElementById('cp-chroma').value)
+  const isLight = document.getElementById('cp-light').checked
+  const fontEl = document.getElementById('cp-font')
+  applyCssVars(generateOklchTheme(h, c, isLight, fontEl ? fontEl.value : null))
 }
 
 function saveCustomTheme() {
-  const a = document.getElementById('cp-accent').value
-  const bg = document.getElementById('cp-bg').value
-  const tx = document.getElementById('cp-text').value
-  localStorage.setItem('custom-colors', JSON.stringify({ accent: a, bg, text: tx }))
+  const h = +(document.getElementById('cp-hue').value)
+  const c = +(document.getElementById('cp-chroma').value)
+  const isLight = document.getElementById('cp-light').checked
+  const fontEl = document.getElementById('cp-font')
+  const textColor = fontEl ? fontEl.value : null
+  localStorage.setItem('custom-colors', JSON.stringify({ h, c, light: isLight, textColor }))
   localStorage.setItem('theme', '自定义')
-  applyCustomColors(a, bg, tx)
+  applyCssVars(generateOklchTheme(h, c, isLight, textColor))
   document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'))
   navigator.vibrate && navigator.vibrate(20)
 }
@@ -2419,6 +2490,7 @@ initCheckin()
 // ── voice input ───────────────────────────────────────────────────────────────
 let recog = null
 let micListening = false
+let micAborted = false
 
 ;(function initMic() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition
@@ -2442,11 +2514,13 @@ let micListening = false
     btn.classList.remove('listening')
     btn.textContent = '🎤'
     statusEl.textContent = '在附近游荡…'
-    if (inp.value.trim()) doSend()
+    if (!micAborted && inp.value.trim()) doSend()
+    micAborted = false
   }
 
   recog.onerror = () => {
     micListening = false
+    micAborted = false
     btn.classList.remove('listening')
     btn.textContent = '🎤'
     statusEl.textContent = '在附近游荡…'
@@ -2457,8 +2531,15 @@ function toggleMic() {
   if (!recog) { alert('当前浏览器不支持语音输入'); return }
   const btn = document.getElementById('mic-btn')
   if (micListening) {
-    recog.stop()
+    micAborted = true
+    micListening = false
+    btn.classList.remove('listening')
+    btn.textContent = '🎤'
+    statusEl.textContent = '在附近游荡…'
+    inp.value = ''
+    recog.abort()
   } else {
+    micAborted = false
     inp.value = ''
     try { recog.start() } catch (_) { return }
     micListening = true
