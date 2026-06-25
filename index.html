@@ -698,6 +698,33 @@
       cursor: pointer;
     }
 
+    /* ── mood chart ── */
+    .mood-chart {
+      display: flex; gap: 6px;
+      padding: 6px 16px 18px;
+      justify-content: space-between;
+    }
+    .mood-day {
+      display: flex; flex-direction: column;
+      align-items: center; gap: 5px;
+      flex: 1;
+    }
+    .mood-dot {
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.04);
+      transition: transform .1s;
+    }
+    .mood-dot.filled { border-color: transparent; }
+    .mood-dot:active { transform: scale(.88); }
+    .mood-day-lbl {
+      font-size: 10px; color: var(--dim);
+      letter-spacing: .02em;
+    }
+
     /* ── memories overlay ── */
     #mem-overlay {
       display: none;
@@ -843,6 +870,8 @@
       <div class="stat-box"><div class="stat-num" id="s-checks">…</div><div class="stat-lbl">次打卡</div></div>
       <div class="stat-box"><div class="stat-num" id="s-letts">…</div><div class="stat-lbl">封信件</div></div>
     </div>
+    <div class="drawer-section-title" style="margin-top:4px">近7天心情</div>
+    <div class="mood-chart" id="mood-chart"></div>
   </div>
 
   <div id="lt-overlay">
@@ -1409,15 +1438,58 @@ function closeDrawer() {
   document.getElementById('drawer-mask').classList.remove('show')
 }
 
+const MOOD_META = {
+  '很好':  { em: '😊', color: '#3dba5e' },
+  '还行':  { em: '😐', color: '#c8b820' },
+  '有点累':{ em: '😮‍💨', color: '#e07830' },
+  '难过':  { em: '😢', color: '#3a8fdd' },
+  '烦躁':  { em: '😤', color: '#dd4444' },
+}
+
 async function loadStats() {
   try {
-    const r = await fetch('/stats')
-    const d = await r.json()
+    const [sr, cr] = await Promise.all([fetch('/stats'), fetch('/checkins?limit=30')])
+    const d = await sr.json()
     document.getElementById('s-msgs').textContent   = d.messages
     document.getElementById('s-days').textContent   = d.days
     document.getElementById('s-checks').textContent = d.checkins
     document.getElementById('s-letts').textContent  = d.letters
+
+    const cd = await cr.json()
+    renderMoodChart(cd.checkins)
   } catch (_) {}
+}
+
+function renderMoodChart(checkins) {
+  const chart = document.getElementById('mood-chart')
+  // build map: CST date string → mood
+  const byDate = {}
+  for (const c of checkins) {
+    const cst = new Date((c.ts + 8 * 3600) * 1000)
+    const key = `${cst.getUTCFullYear()}-${cst.getUTCMonth()}-${cst.getUTCDate()}`
+    if (!byDate[key]) byDate[key] = c  // most recent per day
+  }
+
+  const days = ['日','一','二','三','四','五','六']
+  const cols = []
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(Date.now() + 8 * 3600000 - i * 86400000)
+    const key = `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}`
+    const entry = byDate[key]
+    const meta = entry ? MOOD_META[entry.mood] : null
+    const dotStyle = meta
+      ? `background:${meta.color};` : ''
+    const title = entry ? `${entry.mood}${entry.note ? ' · ' + entry.note : ''}` : '未打卡'
+    cols.push(
+      `<div class="mood-day" title="${escape(title)}">` +
+        `<div class="mood-dot${meta ? ' filled' : ''}" style="${dotStyle}">` +
+          (meta ? meta.em : '') +
+        `</div>` +
+        `<div class="mood-day-lbl">${days[d.getUTCDay()]}</div>` +
+      `</div>`
+    )
+  }
+  chart.innerHTML = cols.join('')
 }
 
 // ── image ─────────────────────────────────────────────────────────────────────

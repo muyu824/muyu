@@ -503,6 +503,16 @@ async def delete_memory(mid: int):
     return {"ok": True}
 
 
+@app.get("/checkins")
+async def list_checkins(limit: int = 30):
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT mood, note, ts FROM checkins ORDER BY id DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+    return {"checkins": [{"mood": r[0], "note": r[1], "ts": r[2]} for r in rows]}
+
+
 @app.get("/checkin/today")
 async def checkin_today():
     cst_now = time.time() + 8 * 3600
