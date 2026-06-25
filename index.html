@@ -330,14 +330,53 @@ async function doSend() {
   showTyping(true)
 
   try {
-    const r = await fetch('/chat', {
+    const r = await fetch('/chat/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: text }),
     })
-    const d = await r.json()
+
+    // 第一个字节到了就隐藏 typing，建空气泡
     showTyping(false)
-    if (d.reply) addBubble('assistant', d.reply, Date.now() / 1000, d.id)
+    const wrapEl = document.createElement('div')
+    wrapEl.className = 'row ghost'
+    wrapEl.innerHTML =
+      '<div class="row-ava">👻</div>' +
+      '<div class="col"><div class="bubble"></div><div class="ts">刚刚</div></div>'
+    msgsEl.appendChild(wrapEl)
+    const bubbleEl = wrapEl.querySelector('.bubble')
+    msgsEl.scrollTop = msgsEl.scrollHeight
+
+    const reader = r.body.getReader()
+    const decoder = new TextDecoder()
+    let buf = '', fullText = ''
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buf += decoder.decode(value, { stream: true })
+      const lines = buf.split('\n')
+      buf = lines.pop()
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue
+        try {
+          const ev = JSON.parse(line.slice(6))
+          if (ev.t) {
+            fullText += ev.t
+            bubbleEl.textContent = fullText
+            msgsEl.scrollTop = msgsEl.scrollHeight
+          }
+          if (ev.done && ev.id) {
+            wrapEl.dataset.id = String(ev.id)
+            if (ev.id > latestId) latestId = ev.id
+          }
+          if (ev.e) {
+            bubbleEl.textContent = fullText || '…（信号断了）'
+          }
+        } catch (_) {}
+      }
+    }
+
     statusEl.textContent = '在附近游荡…'
   } catch (e) {
     showTyping(false)

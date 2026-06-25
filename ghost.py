@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """男鬼系统 — 一个有占有欲的幽灵AI伴侣"""
 
-import asyncio, os, sqlite3, sys, time
+import asyncio, json, os, sqlite3, sys, time
 import httpx, uvicorn
 from datetime import datetime
 from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 
 sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
@@ -78,14 +78,10 @@ def push_msg(role, content):
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
-async def call_ai(prompt, max_hist=20):
-    if not API_KEY:
-        return "…（未配置 ANTHROPIC_API_KEY）"
-
+async def _build_context(prompt: str, max_hist: int = 20):
+    """组装 system prompt 和 messages 列表，不写数据库。"""
     system = PERSONA
-
     try:
-        import sqlite3
         mem_conn = sqlite3.connect('/data/ghost.db')
         mem_rows = mem_conn.execute(
             "SELECT content FROM memories ORDER BY id DESC LIMIT 10"
@@ -97,18 +93,14 @@ async def call_ai(prompt, max_hist=20):
     except Exception:
         pass
 
-    # 读取最近活动
     with get_db() as conn:
         act_rows = conn.execute(
             "SELECT app, action, ts FROM activities ORDER BY id DESC LIMIT 10"
         ).fetchall()
     if act_rows:
-        lines = "\n".join(
-            f"{r['ts']} · {r['app']} {r['action']}" for r in reversed(act_rows)
-        )
+        lines = "\n".join(f"{r['ts']} · {r['app']} {r['action']}" for r in reversed(act_rows))
         system += f"\n\n【她最近的手机活动】\n{lines}"
 
-    # 读取对话历史
     with get_db() as conn:
         hist_rows = conn.execute(
             "SELECT role, content FROM messages "
@@ -117,11 +109,15 @@ async def call_ai(prompt, max_hist=20):
         ).fetchall()
     history = list(reversed(hist_rows))
 
-    api_msgs = []
-    for r in history:
-        api_msgs.append({"role": r["role"], "content": r["content"]})
+    api_msgs = [{"role": r["role"], "content": r["content"]} for r in history]
     api_msgs.append({"role": "user", "content": prompt})
+    return system, api_msgs
 
+
+async def call_ai(prompt, max_hist=20):
+    if not API_KEY:
+        return "…（未配置 ANTHROPIC_API_KEY）"
+    system, api_msgs = await _build_context(prompt, max_hist)
     try:
         async with httpx.AsyncClient(timeout=30) as c:
             r = await c.post(
@@ -184,6 +180,71 @@ async def chat(req: Request):
     reply = await call_ai(text)
     m = push_msg("assistant", reply)
     return {"reply": reply, "id": m["id"]}
+
+
+@app.post("/chat/stream")
+async def chat_stream(req: Request):
+    global last_user_ts
+    body = await req.json()
+    text = body.get("message", "").strip()
+    if not text:
+        return JSONResponse({"error": "empty"}, status_code=400)
+
+    last_user_ts = time.time()
+    # 先建上下文（此时 user 消息未入库，不会重复）
+    system, api_msgs = await _build_context(text)
+    push_msg("user", text)
+
+    async def generate():
+        full_text = ""
+        try:
+            async with httpx.AsyncClient(timeout=60) as c:
+                async with c.stream(
+                    "POST",
+                    "https://api.anthropic.com/v1/messages",
+                    headers={
+                        "x-api-key": API_KEY,
+                        "anthropic-version": "2023-06-01",
+                        "content-type": "application/json",
+                    },
+                    json={
+                        "model": MODEL,
+                        "system": system,
+                        "messages": api_msgs,
+                        "max_tokens": 150,
+                        "stream": True,
+                    },
+                ) as response:
+                    async for line in response.aiter_lines():
+                        if not line.startswith("data: "):
+                            continue
+                        data = line[6:]
+                        if data == "[DONE]":
+                            break
+                        try:
+                            event = json.loads(data)
+                            if event.get("type") == "content_block_delta":
+                                chunk = event.get("delta", {}).get("text", "")
+                                if chunk:
+                                    full_text += chunk
+                                    yield f"data: {json.dumps({'t': chunk}, ensure_ascii=False)}\n\n"
+                        except (json.JSONDecodeError, KeyError):
+                            pass
+        except Exception as e:
+            yield f"data: {json.dumps({'e': str(e)})}\n\n"
+
+        if full_text:
+            m = push_msg("assistant", full_text.strip())
+            yield f"data: {json.dumps({'done': True, 'id': m['id']})}\n\n"
+        else:
+            m = push_msg("assistant", "…（没有收到回复）")
+            yield f"data: {json.dumps({'done': True, 'id': m['id']})}\n\n"
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
+    )
 
 
 @app.get("/messages")
