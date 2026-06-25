@@ -87,7 +87,7 @@ async def send_ntfy(text):
             await c.post(
                 NTFY_URL,
                 content=text.encode("utf-8"),
-                headers={"Title": "👻 男鬼", "Priority": "default"},
+                headers={"Title": "muyu", "Priority": "default"},
             )
     except Exception:
         pass
