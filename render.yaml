@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: ghost
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python ghost.py
+    envVars:
+      - key: OPENROUTER_API_KEY
+        sync: false       # 在 Render 控制台手动填写，不写进代码
+    healthCheckPath: /
