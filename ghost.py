@@ -326,6 +326,18 @@ async def list_letters():
     return {"letters": [dict(r) for r in rows]}
 
 
+@app.get("/stats")
+async def stats():
+    with get_db() as conn:
+        msgs   = conn.execute("SELECT COUNT(*) FROM messages WHERE role='user'").fetchone()[0]
+        checks = conn.execute("SELECT COUNT(*) FROM checkins").fetchone()[0]
+        letts  = conn.execute("SELECT COUNT(*) FROM letters").fetchone()[0]
+        days   = conn.execute(
+            "SELECT COUNT(DISTINCT date(ts,'unixepoch')) FROM messages WHERE role='user'"
+        ).fetchone()[0]
+    return {"messages": msgs, "checkins": checks, "letters": letts, "days": days}
+
+
 @app.get("/checkin/today")
 async def checkin_today():
     cst_now = time.time() + 8 * 3600

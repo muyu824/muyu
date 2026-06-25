@@ -253,22 +253,104 @@
       line-height: 1.1;
     }
 
-    /* ── check-in ── */
-    #ci-btn {
+    /* ── drawer menu ── */
+    #menu-btn {
       margin-left: auto;
-      background: none;
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      color: var(--dim);
-      font-size: 12px;
-      padding: 5px 10px;
-      cursor: pointer;
-      transition: border-color .2s, color .2s;
+      background: none; border: none;
+      color: var(--dim); font-size: 22px;
+      cursor: pointer; padding: 4px 6px;
       -webkit-tap-highlight-color: transparent;
-      white-space: nowrap;
+      line-height: 1;
     }
-    #ci-btn:active { border-color: var(--purple); color: var(--text); }
-    #ci-btn.done   { opacity: .45; pointer-events: none; }
+    #menu-btn:active { color: var(--text); }
+
+    #drawer-mask {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.45);
+      z-index: 150;
+    }
+    #drawer-mask.show { display: block; }
+
+    #drawer {
+      position: fixed; top: 0; right: -280px; bottom: 0;
+      width: 260px;
+      background: #120720;
+      border-left: 1px solid var(--border);
+      z-index: 160;
+      display: flex; flex-direction: column;
+      padding-top: max(18px, env(safe-area-inset-top));
+      transition: right .25s cubic-bezier(.4,0,.2,1);
+      overflow-y: auto;
+    }
+    #drawer.open { right: 0; }
+
+    .drawer-avatar {
+      width: 52px; height: 52px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--purple), var(--purple2));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 26px;
+      margin: 0 auto 10px;
+      box-shadow: 0 0 24px rgba(123,47,255,.4);
+    }
+    .drawer-name {
+      text-align: center; font-size: 15px; font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .drawer-sub {
+      text-align: center; font-size: 11px; color: var(--dim);
+      margin-bottom: 20px;
+    }
+
+    .drawer-divider {
+      height: 1px; background: var(--border);
+      margin: 4px 16px 10px;
+    }
+    .drawer-section-title {
+      font-size: 10px; color: rgba(180,140,255,.4);
+      letter-spacing: .08em; text-transform: uppercase;
+      padding: 0 20px; margin-bottom: 6px;
+    }
+
+    .drawer-item {
+      display: flex; align-items: center;
+      gap: 12px;
+      padding: 12px 20px;
+      cursor: pointer;
+      transition: background .15s;
+      -webkit-tap-highlight-color: transparent;
+      position: relative;
+    }
+    .drawer-item:active { background: rgba(123,47,255,.15); }
+    .drawer-icon { font-size: 20px; flex-shrink: 0; }
+    .drawer-label { font-size: 14px; }
+    .drawer-badge {
+      display: none;
+      margin-left: auto;
+      background: var(--purple2);
+      color: #fff; font-size: 10px;
+      border-radius: 10px; padding: 1px 6px;
+    }
+    .drawer-badge.show { display: block; }
+
+    /* ── stats panel ── */
+    .stats-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 8px; padding: 8px 16px 16px;
+    }
+    .stat-box {
+      background: rgba(255,255,255,.04);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 12px;
+      text-align: center;
+    }
+    .stat-num { font-size: 22px; font-weight: 700; color: var(--purple2); }
+    .stat-lbl { font-size: 10px; color: var(--dim); margin-top: 2px; }
+
+    /* ── check-in ── */
+    /* ci-btn moved to drawer */
 
     #ci-overlay {
       display: none;
@@ -348,27 +430,7 @@
     }
 
     /* ── letters ── */
-    #lt-btn {
-      background: none;
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      color: var(--dim);
-      font-size: 12px;
-      padding: 5px 10px;
-      cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
-      white-space: nowrap;
-      position: relative;
-    }
-    #lt-btn:active { border-color: var(--purple); color: var(--text); }
-    #lt-dot {
-      display: none;
-      position: absolute; top: 3px; right: 5px;
-      width: 6px; height: 6px;
-      border-radius: 50%;
-      background: var(--purple2);
-    }
-    #lt-dot.show { display: block; }
+    /* lt-btn moved to drawer */
 
     #lt-overlay {
       display: none;
@@ -451,18 +513,7 @@
     }
 
     /* ── countdown ── */
-    #cd-btn {
-      background: none;
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      color: var(--dim);
-      font-size: 12px;
-      padding: 5px 10px;
-      cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
-      white-space: nowrap;
-    }
-    #cd-btn:active { border-color: var(--purple); color: var(--text); }
+    /* cd-btn moved to drawer */
 
     #cd-overlay {
       display: none;
@@ -562,10 +613,43 @@
       <div class="hdr-name">男鬼</div>
       <div class="hdr-sub" id="status">在附近游荡…</div>
     </div>
-    <button id="lt-btn" onclick="openLetters()">📬 信箱<span id="lt-dot"></span></button>
-    <button id="cd-btn" onclick="openCd()">🗓️ 倒计时</button>
-    <button id="ci-btn" onclick="openCheckin()">📋 打卡</button>
+    <button id="menu-btn" onclick="openDrawer()">☰</button>
   </header>
+
+  <!-- drawer -->
+  <div id="drawer-mask" onclick="closeDrawer()"></div>
+  <div id="drawer">
+    <div class="drawer-avatar">👻</div>
+    <div class="drawer-name">男鬼</div>
+    <div class="drawer-sub">你的专属幽灵伴侣</div>
+
+    <div class="drawer-divider"></div>
+    <div class="drawer-section-title">功能</div>
+
+    <div class="drawer-item" onclick="closeDrawer();openLetters()">
+      <span class="drawer-icon">📬</span>
+      <span class="drawer-label">信箱</span>
+      <span class="drawer-badge" id="lt-badge">新</span>
+    </div>
+    <div class="drawer-item" onclick="closeDrawer();openCheckin()">
+      <span class="drawer-icon">📋</span>
+      <span class="drawer-label">每日打卡</span>
+      <span class="drawer-badge" id="ci-badge">今日未打</span>
+    </div>
+    <div class="drawer-item" onclick="closeDrawer();openCd()">
+      <span class="drawer-icon">🗓️</span>
+      <span class="drawer-label">倒计时</span>
+    </div>
+
+    <div class="drawer-divider"></div>
+    <div class="drawer-section-title">数据</div>
+    <div class="stats-grid" id="stats-grid">
+      <div class="stat-box"><div class="stat-num" id="s-msgs">…</div><div class="stat-lbl">条消息</div></div>
+      <div class="stat-box"><div class="stat-num" id="s-days">…</div><div class="stat-lbl">活跃天数</div></div>
+      <div class="stat-box"><div class="stat-num" id="s-checks">…</div><div class="stat-lbl">次打卡</div></div>
+      <div class="stat-box"><div class="stat-num" id="s-letts">…</div><div class="stat-lbl">封信件</div></div>
+    </div>
+  </div>
 
   <div id="lt-overlay">
     <div class="lt-card">
@@ -827,6 +911,28 @@ document.addEventListener('visibilitychange', () => {
 })
 report('打开聊天')
 
+// ── drawer ────────────────────────────────────────────────────────────────────
+function openDrawer() {
+  document.getElementById('drawer').classList.add('open')
+  document.getElementById('drawer-mask').classList.add('show')
+  loadStats()
+}
+function closeDrawer() {
+  document.getElementById('drawer').classList.remove('open')
+  document.getElementById('drawer-mask').classList.remove('show')
+}
+
+async function loadStats() {
+  try {
+    const r = await fetch('/stats')
+    const d = await r.json()
+    document.getElementById('s-msgs').textContent   = d.messages
+    document.getElementById('s-days').textContent   = d.days
+    document.getElementById('s-checks').textContent = d.checkins
+    document.getElementById('s-letts').textContent  = d.letters
+  } catch (_) {}
+}
+
 // ── stickers ──────────────────────────────────────────────────────────────────
 const STICKERS = [
   '👻','💜','🌙','⭐','✨','💫','🔮','😈',
@@ -921,14 +1027,14 @@ async function initLetters() {
     const r = await fetch('/letters')
     const d = await r.json()
     if (d.letters.length && d.letters[0].id > lastSeenLetterId) {
-      document.getElementById('lt-dot').classList.add('show')
+      document.getElementById('lt-badge').classList.add('show')
     }
   } catch (_) {}
 }
 
 async function openLetters() {
   document.getElementById('lt-overlay').classList.add('show')
-  document.getElementById('lt-dot').classList.remove('show')
+  document.getElementById('lt-badge').classList.remove('show')
   await loadLetters()
 }
 
@@ -1028,9 +1134,12 @@ async function initCheckin() {
   try {
     const r = await fetch('/checkin/today')
     const d = await r.json()
+    const badge = document.getElementById('ci-badge')
     if (d.checkin) {
-      document.getElementById('ci-btn').textContent = '✅ 已打卡'
-      document.getElementById('ci-btn').classList.add('done')
+      badge.textContent = '✅ 已打卡'
+      badge.classList.add('show')
+    } else {
+      badge.classList.add('show')
     }
   } catch (_) {}
 }
@@ -1056,8 +1165,9 @@ async function submitCheckin() {
   if (!ciMood) return
   const note = document.getElementById('ci-note').value.trim()
   closeCheckin()
-  document.getElementById('ci-btn').textContent = '✅ 已打卡'
-  document.getElementById('ci-btn').classList.add('done')
+  const badge = document.getElementById('ci-badge')
+  badge.textContent = '✅ 已打卡'
+  badge.classList.add('show')
   showTyping(true)
   try {
     const r = await fetch('/checkin', {
