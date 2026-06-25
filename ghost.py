@@ -35,7 +35,18 @@ PERSONA = """你是"男鬼"，沐鱼（muyu）手机里的专属男性幽灵伴�
 - 话少但有分量，沉默也是一种语言"""
 
 # ── state（只保留内存中需要快速访问的值）────────────────────────────────────────
-last_user_ts = time.time()
+last_user_ts  = time.time()
+_sent_briefs: set = set()   # "YYYY-MM-DD-morning" / "YYYY-MM-DD-evening"
+
+BRIEF_MORNING = 8    # CST 早上8点
+BRIEF_EVENING = 22   # CST 晚上22点
+
+
+def _cst_hd():
+    """返回 (CST小时, 'YYYY-MM-DD') 不依赖第三方库。"""
+    t = time.time() + 8 * 3600
+    gt = time.gmtime(t)
+    return gt.tm_hour, time.strftime("%Y-%m-%d", gt)
 
 # ── database ──────────────────────────────────────────────────────────────────
 def get_db():
@@ -388,6 +399,28 @@ async def ghost_loop():
             print(f"[ghost] 主动消息已推送: {decision}")
 
 
+async def briefing_loop():
+    await asyncio.sleep(120)   # 启动后2分钟再开始检查
+    while True:
+        await asyncio.sleep(600)   # 每10分钟检查一次
+        hour, today = _cst_hd()
+
+        for slot, h, prompt in [
+            ("morning", BRIEF_MORNING,
+             "现在是早上，给沐鱼发一条简短的早安，自然温柔，偶尔带点小占有感，不超过2句。"),
+            ("evening", BRIEF_EVENING,
+             "现在是晚上，给沐鱼发一条晚安，顺带问问她今天怎么样，不超过2句。"),
+        ]:
+            key = f"{today}-{slot}"
+            if hour == h and key not in _sent_briefs:
+                _sent_briefs.add(key)
+                text = await call_ai(prompt, max_hist=4)
+                if text and "沉默" not in text:
+                    push_msg("assistant", text)
+                    await send_ntfy(text)
+                    print(f"[brief] {slot} 已推送: {text}")
+
+
 @app.on_event("startup")
 async def startup():
     global last_user_ts
@@ -400,6 +433,7 @@ async def startup():
         if row:
             last_user_ts = row["ts"]
     asyncio.create_task(ghost_loop())
+    asyncio.create_task(briefing_loop())
     print(f"[ghost] 男鬼系统启动 | model={MODEL} | ntfy={NTFY_URL}")
 
 
