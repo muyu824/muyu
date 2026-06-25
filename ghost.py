@@ -89,6 +89,13 @@ def init_db():
                 target_date TEXT NOT NULL
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS letters (
+                id      INTEGER PRIMARY KEY AUTOINCREMENT,
+                content TEXT NOT NULL,
+                ts      REAL NOT NULL
+            )
+        """)
         conn.commit()
 
 
@@ -184,17 +191,17 @@ ANTHROPIC_HEADERS = {
 }
 
 
-async def call_ai(prompt, max_hist=20):
+async def call_ai(prompt, max_hist=20, max_tokens=150):
     if not API_KEY:
         return "…（未配置 ANTHROPIC_API_KEY）"
     system_parts, api_msgs = await _build_context(prompt, max_hist)
     headers = {**ANTHROPIC_HEADERS, "x-api-key": API_KEY}
     try:
-        async with httpx.AsyncClient(timeout=30) as c:
+        async with httpx.AsyncClient(timeout=60) as c:
             r = await c.post(
                 "https://api.anthropic.com/v1/messages",
                 headers=headers,
-                json={"model": MODEL, "system": system_parts, "messages": api_msgs, "max_tokens": 150},
+                json={"model": MODEL, "system": system_parts, "messages": api_msgs, "max_tokens": max_tokens},
             )
             r.raise_for_status()
             return r.json()["content"][0]["text"].strip()
@@ -303,6 +310,15 @@ async def service_worker():
 async def icon():
     from fastapi.responses import Response
     return Response(content=ICON_SVG, media_type="image/svg+xml")
+
+
+@app.get("/letters")
+async def list_letters():
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT id, content, ts FROM letters ORDER BY id DESC LIMIT 20"
+        ).fetchall()
+    return {"letters": [dict(r) for r in rows]}
 
 
 @app.get("/checkin/today")
@@ -533,6 +549,37 @@ async def briefing_loop():
                     print(f"[brief] {slot} 已推送: {text}")
 
 
+async def letter_loop():
+    await asyncio.sleep(180)
+    while True:
+        await asyncio.sleep(3600)   # 每小时检查一次
+        # 7天内有信就跳过
+        with get_db() as conn:
+            row = conn.execute(
+                "SELECT id FROM letters WHERE ts >= ? ORDER BY id DESC LIMIT 1",
+                (time.time() - 7 * 86400,),
+            ).fetchone()
+        if row:
+            continue
+
+        letter = await call_ai(
+            '请以男鬼的身份，给沐鱼写一封手写风格的信。'
+            '可以聊聊最近观察到她的状态、你的感受、想对她说的话。'
+            '语气私密温柔，像真正写给心上人的信，200字左右，不需要称呼和落款。',
+            max_hist=10,
+            max_tokens=600,
+        )
+        if letter and not letter.startswith("error"):
+            with get_db() as conn:
+                conn.execute(
+                    "INSERT INTO letters (content, ts) VALUES (?, ?)",
+                    (letter, time.time()),
+                )
+                conn.commit()
+            await send_ntfy("📬 你有一封新信件")
+            print(f"[letter] 新信件已写好（{len(letter)}字）")
+
+
 @app.on_event("startup")
 async def startup():
     global last_user_ts
@@ -546,6 +593,7 @@ async def startup():
             last_user_ts = row["ts"]
     asyncio.create_task(ghost_loop())
     asyncio.create_task(briefing_loop())
+    asyncio.create_task(letter_loop())
     print(f"[ghost] 男鬼系统启动 | model={MODEL} | ntfy={NTFY_URL}")
 
 
