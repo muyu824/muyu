@@ -1317,7 +1317,7 @@ function addBubble(role, text, ts, id) {
   const stickerClass = isSticker(text) ? ' sticker-bubble' : ''
   wrap.innerHTML = (!isUser ? rowAvaHtml() : '') +
     `<div class="col">` +
-      `<div class="bubble${stickerClass}">${escape(text).replace(/\n/g,'<br>')}</div>` +
+      `<div class="bubble${stickerClass}">${escape(text).replace(/\n{2,}/g,'\n').replace(/\n/g,'<br>')}</div>` +
       `<div class="ts">${ts ? fmt(ts) : '刚刚'}</div>` +
     `</div>`
 
@@ -1400,7 +1400,7 @@ async function doSend() {
           const ev = JSON.parse(line.slice(6))
           if (ev.t) {
             fullText += ev.t
-            bubbleEl.textContent = fullText
+            bubbleEl.textContent = fullText.replace(/\n{2,}/g, '\n')
             msgsEl.scrollTop = msgsEl.scrollHeight
           }
           if (ev.done && ev.id) {
@@ -1408,13 +1408,13 @@ async function doSend() {
             if (ev.id > latestId) latestId = ev.id
           }
           if (ev.e) {
-            bubbleEl.textContent = fullText || '…（信号断了）'
+            bubbleEl.textContent = fullText.replace(/\n{2,}/g, '\n') || '…（信号断了）'
           }
         } catch (_) {}
       }
     }
 
-    if (fullText) attachLongPress(bubbleEl, fullText.trim())
+    if (fullText) { fullText = fullText.replace(/\n{2,}/g, '\n'); attachLongPress(bubbleEl, fullText.trim()) }
     statusEl.textContent = '在附近游荡…'
   } catch (e) {
     showTyping(false)
@@ -2237,12 +2237,12 @@ async function sendImageSticker(src) {
         if (!line.startsWith('data: ')) continue
         try {
           const ev = JSON.parse(line.slice(6))
-          if (ev.t) { fullText += ev.t; bubbleEl.textContent = fullText; msgsEl.scrollTop = msgsEl.scrollHeight }
+          if (ev.t) { fullText += ev.t; bubbleEl.textContent = fullText.replace(/\n{2,}/g, '\n'); msgsEl.scrollTop = msgsEl.scrollHeight }
           if (ev.done && ev.id) { wrapEl.dataset.id = String(ev.id); if (ev.id > latestId) latestId = ev.id }
         } catch (_) {}
       }
     }
-    if (fullText) attachLongPress(bubbleEl, fullText.trim())
+    if (fullText) { fullText = fullText.replace(/\n{2,}/g, '\n'); attachLongPress(bubbleEl, fullText.trim()) }
     statusEl.textContent = '在附近游荡…'
   } catch (_) {
     showTyping(false)
@@ -2300,8 +2300,9 @@ async function sendSticker(emoji) {
           const ev = JSON.parse(line.slice(6))
           if (ev.t) {
             fullText += ev.t
-            bubbleEl.textContent = fullText
-            if (isSticker(fullText)) bubbleEl.classList.add('sticker-bubble')
+            const disp = fullText.replace(/\n{2,}/g, '\n')
+            bubbleEl.textContent = disp
+            if (isSticker(disp)) bubbleEl.classList.add('sticker-bubble')
             else bubbleEl.classList.remove('sticker-bubble')
             msgsEl.scrollTop = msgsEl.scrollHeight
           }
@@ -2312,7 +2313,7 @@ async function sendSticker(emoji) {
         } catch (_) {}
       }
     }
-    if (fullText) attachLongPress(bubbleEl, fullText.trim())
+    if (fullText) { fullText = fullText.replace(/\n{2,}/g, '\n'); attachLongPress(bubbleEl, fullText.trim()) }
     statusEl.textContent = '在附近游荡…'
   } catch (_) {
     showTyping(false)
