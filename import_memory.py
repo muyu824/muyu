@@ -12,8 +12,8 @@ import httpx
 
 # ── config ────────────────────────────────────────────────────────────────────
 API_KEY       = os.environ.get("OPENROUTER_API_KEY", "")
-MODEL         = "anthropic/claude-sonnet-4-5"
-DB_PATH       = Path("/data/ghost.db")
+MODEL         = "meta-llama/llama-3.3-70b-instruct"
+DB_PATH       = Path("./ghost_memories.db")
 CONV_FILE     = Path("conversations.json")
 DELAY_BETWEEN = 1.5   # 每次API调用之间的间隔（秒），避免触发限速
 
