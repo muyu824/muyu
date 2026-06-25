@@ -91,9 +91,11 @@ async def send_ntfy(text):
 
 
 # ── routes ────────────────────────────────────────────────────────────────────
+BASE_DIR = Path(__file__).parent
+
 @app.get("/")
 async def index():
-    return HTMLResponse(Path("index.html").read_text("utf-8"))
+    return HTMLResponse((BASE_DIR / "index.html").read_text("utf-8"))
 
 
 @app.post("/activity")

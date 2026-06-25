@@ -5,3 +5,18 @@ __pycache__/
 venv/
 *.egg-info/
 .DS_Store
+
+# Claude Code 内部文件
+.claude/
+.claude.json
+.claude.json.backup
+
+# Windows 系统文件
+AppData/
+Desktop/
+Documents/
+Downloads/
+Pictures/
+Videos/
+Music/
+OneDrive/
