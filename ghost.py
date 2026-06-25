@@ -233,10 +233,30 @@ async def send_ntfy(text):
         pass
 
 
+ICON_SVG = """\
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#1a0a2e"/>
+  <circle cx="256" cy="260" r="190" fill="#7b2fff" opacity="0.25"/>
+  <text x="256" y="340" text-anchor="middle" font-size="240" font-family="system-ui,sans-serif">👻</text>
+</svg>"""
+
 # ── routes ────────────────────────────────────────────────────────────────────
 @app.get("/")
 async def index():
     return FileResponse(BASE_DIR / "index.html")
+
+@app.get("/manifest.json")
+async def manifest():
+    return FileResponse(BASE_DIR / "manifest.json", media_type="application/manifest+json")
+
+@app.get("/sw.js")
+async def service_worker():
+    return FileResponse(BASE_DIR / "sw.js", media_type="application/javascript")
+
+@app.get("/icon.svg")
+async def icon():
+    from fastapi.responses import Response
+    return Response(content=ICON_SVG, media_type="image/svg+xml")
 
 
 @app.post("/activity")
