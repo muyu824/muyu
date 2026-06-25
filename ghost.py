@@ -110,6 +110,13 @@ def init_db():
                 ts       REAL NOT NULL
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS memories (
+                id      INTEGER PRIMARY KEY AUTOINCREMENT,
+                content TEXT NOT NULL,
+                ts      REAL NOT NULL
+            )
+        """)
         conn.commit()
 
 
@@ -460,6 +467,23 @@ async def stats():
             "SELECT COUNT(DISTINCT date(ts,'unixepoch')) FROM messages WHERE role='user'"
         ).fetchone()[0]
     return {"messages": msgs, "checkins": checks, "letters": letts, "days": days}
+
+
+@app.post("/memory")
+async def add_memory(req: Request):
+    body = await req.json()
+    text = (body.get("text") or "").strip()
+    if not text:
+        return JSONResponse({"error": "empty"}, status_code=400)
+    if len(text) > 500:
+        text = text[:500]
+    with get_db() as conn:
+        conn.execute(
+            "INSERT INTO memories (content, ts) VALUES (?, ?)",
+            (text, time.time()),
+        )
+        conn.commit()
+    return {"ok": True}
 
 
 @app.get("/checkin/today")
