@@ -469,6 +469,15 @@ async def stats():
     return {"messages": msgs, "checkins": checks, "letters": letts, "days": days}
 
 
+@app.get("/memories")
+async def list_memories():
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT id, content, ts FROM memories ORDER BY id DESC"
+        ).fetchall()
+    return {"memories": [{"id": r[0], "content": r[1], "ts": r[2]} for r in rows]}
+
+
 @app.post("/memory")
 async def add_memory(req: Request):
     body = await req.json()
@@ -482,6 +491,14 @@ async def add_memory(req: Request):
             "INSERT INTO memories (content, ts) VALUES (?, ?)",
             (text, time.time()),
         )
+        conn.commit()
+    return {"ok": True}
+
+
+@app.delete("/memory/{mid}")
+async def delete_memory(mid: int):
+    with get_db() as conn:
+        conn.execute("DELETE FROM memories WHERE id = ?", (mid,))
         conn.commit()
     return {"ok": True}
 
