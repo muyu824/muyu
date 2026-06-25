@@ -204,6 +204,100 @@
     }
     #send:active { transform: scale(.91); opacity: .82; }
 
+    /* ── check-in ── */
+    #ci-btn {
+      margin-left: auto;
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      color: var(--dim);
+      font-size: 12px;
+      padding: 5px 10px;
+      cursor: pointer;
+      transition: border-color .2s, color .2s;
+      -webkit-tap-highlight-color: transparent;
+      white-space: nowrap;
+    }
+    #ci-btn:active { border-color: var(--purple); color: var(--text); }
+    #ci-btn.done   { opacity: .45; pointer-events: none; }
+
+    #ci-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(10,3,20,.88);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+    }
+    #ci-overlay.show { display: flex; }
+
+    .ci-card {
+      background: rgba(255,255,255,.06);
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      padding: 28px 20px 22px;
+      width: min(310px, 90vw);
+      text-align: center;
+    }
+    .ci-title { font-size: 15px; color: var(--dim); margin-bottom: 20px; }
+
+    .mood-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .mood-btn {
+      background: rgba(255,255,255,.05);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 2px 8px;
+      cursor: pointer;
+      display: flex; flex-direction: column;
+      align-items: center; gap: 4px;
+      transition: background .15s, border-color .15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .mood-btn:active, .mood-btn.sel {
+      background: rgba(123,47,255,.3);
+      border-color: var(--purple);
+    }
+    .mood-btn .em { font-size: 26px; }
+    .mood-btn .lb { font-size: 10px; color: var(--dim); }
+
+    #ci-note {
+      width: 100%;
+      background: rgba(255,255,255,.05);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 9px 12px;
+      color: var(--text);
+      font-size: 14px;
+      font-family: inherit;
+      resize: none;
+      outline: none;
+      margin-bottom: 14px;
+    }
+    #ci-note::placeholder { color: rgba(180,140,255,.3); }
+
+    #ci-submit {
+      width: 100%;
+      padding: 11px;
+      border: none;
+      border-radius: 14px;
+      background: linear-gradient(135deg, var(--purple), var(--purple2));
+      color: #fff;
+      font-size: 15px;
+      cursor: pointer;
+    }
+    #ci-cancel {
+      display: block; margin-top: 10px;
+      background: none; border: none;
+      color: var(--dim); font-size: 13px; cursor: pointer;
+    }
+
     /* ── bg particles ── */
     #bg {
       position: fixed; inset: 0;
@@ -231,7 +325,34 @@
       <div class="hdr-name">男鬼</div>
       <div class="hdr-sub" id="status">在附近游荡…</div>
     </div>
+    <button id="ci-btn" onclick="openCheckin()">📋 打卡</button>
   </header>
+
+  <div id="ci-overlay">
+    <div class="ci-card">
+      <div class="ci-title">今天怎么样？</div>
+      <div class="mood-grid">
+        <button class="mood-btn" data-mood="很好" onclick="selMood(this)">
+          <span class="em">😊</span><span class="lb">很好</span>
+        </button>
+        <button class="mood-btn" data-mood="还行" onclick="selMood(this)">
+          <span class="em">😐</span><span class="lb">还行</span>
+        </button>
+        <button class="mood-btn" data-mood="有点累" onclick="selMood(this)">
+          <span class="em">😮‍💨</span><span class="lb">有点累</span>
+        </button>
+        <button class="mood-btn" data-mood="难过" onclick="selMood(this)">
+          <span class="em">😢</span><span class="lb">难过</span>
+        </button>
+        <button class="mood-btn" data-mood="烦躁" onclick="selMood(this)">
+          <span class="em">😤</span><span class="lb">烦躁</span>
+        </button>
+      </div>
+      <textarea id="ci-note" rows="2" placeholder="想说点什么…（可选）"></textarea>
+      <button id="ci-submit" onclick="submitCheckin()">发送给男鬼</button>
+      <button id="ci-cancel" onclick="closeCheckin()">取消</button>
+    </div>
+  </div>
 
   <div id="msgs">
     <div class="row ghost">
@@ -427,6 +548,60 @@ document.addEventListener('visibilitychange', () => {
   report(document.hidden ? '切出页面' : '回到页面')
 })
 report('打开聊天')
+
+// ── check-in ──────────────────────────────────────────────────────────────────
+let ciMood = ''
+
+async function initCheckin() {
+  try {
+    const r = await fetch('/checkin/today')
+    const d = await r.json()
+    if (d.checkin) {
+      document.getElementById('ci-btn').textContent = '✅ 已打卡'
+      document.getElementById('ci-btn').classList.add('done')
+    }
+  } catch (_) {}
+}
+
+function openCheckin() {
+  ciMood = ''
+  document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('sel'))
+  document.getElementById('ci-note').value = ''
+  document.getElementById('ci-overlay').classList.add('show')
+}
+
+function closeCheckin() {
+  document.getElementById('ci-overlay').classList.remove('show')
+}
+
+function selMood(btn) {
+  document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('sel'))
+  btn.classList.add('sel')
+  ciMood = btn.dataset.mood
+}
+
+async function submitCheckin() {
+  if (!ciMood) return
+  const note = document.getElementById('ci-note').value.trim()
+  closeCheckin()
+  document.getElementById('ci-btn').textContent = '✅ 已打卡'
+  document.getElementById('ci-btn').classList.add('done')
+  showTyping(true)
+  try {
+    const r = await fetch('/checkin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mood: ciMood, note }),
+    })
+    const d = await r.json()
+    showTyping(false)
+    if (d.reply) addBubble('assistant', d.reply, Date.now() / 1000, d.id)
+  } catch (_) {
+    showTyping(false)
+  }
+}
+
+initCheckin()
 
 // ── service worker ────────────────────────────────────────────────────────────
 if ('serviceWorker' in navigator) {

@@ -74,6 +74,14 @@ def init_db():
                 ts      TEXT    NOT NULL
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS checkins (
+                id   INTEGER PRIMARY KEY AUTOINCREMENT,
+                mood TEXT NOT NULL,
+                note TEXT,
+                ts   REAL NOT NULL
+            )
+        """)
         conn.commit()
 
 
@@ -268,6 +276,42 @@ async def service_worker():
 async def icon():
     from fastapi.responses import Response
     return Response(content=ICON_SVG, media_type="image/svg+xml")
+
+
+@app.get("/checkin/today")
+async def checkin_today():
+    cst_now = time.time() + 8 * 3600
+    day_start_utc = (cst_now - cst_now % 86400) - 8 * 3600
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT mood, note, ts FROM checkins WHERE ts >= ? ORDER BY id DESC LIMIT 1",
+            (day_start_utc,),
+        ).fetchone()
+    return {"checkin": dict(row) if row else None}
+
+
+@app.post("/checkin")
+async def checkin(req: Request):
+    data = await req.json()
+    mood = data.get("mood", "").strip()
+    note = data.get("note", "").strip()
+    if not mood:
+        return JSONResponse({"error": "empty"}, status_code=400)
+
+    with get_db() as conn:
+        conn.execute(
+            "INSERT INTO checkins (mood, note, ts) VALUES (?, ?, ?)",
+            (mood, note, time.time()),
+        )
+        conn.commit()
+
+    extra = f"，她还说：{note}" if note else ""
+    reply = await call_ai(
+        f"沐鱼今天打卡了，心情是"{mood}"{extra}。给她一个简短回应，温柔关心，不超过2句。",
+        max_hist=4,
+    )
+    m = push_msg("assistant", reply)
+    return {"reply": reply, "id": m["id"]}
 
 
 @app.post("/activity")
