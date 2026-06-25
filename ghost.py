@@ -20,7 +20,7 @@ app.add_middleware(
 # ── config ────────────────────────────────────────────────────────────────────
 API_KEY  = os.environ.get("OPENROUTER_API_KEY", "")
 NTFY_URL = "https://ntfy.sh/claude-muyu-lovestory-624"
-MODEL    = "anthropic/claude-sonnet-4-5"
+MODEL    = "anthropic/claude-3.5-sonnet"
 BASE_DIR = Path(__file__).parent
 DB_PATH  = Path("/data/ghost.db")
 
