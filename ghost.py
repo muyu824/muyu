@@ -79,8 +79,9 @@ def push_msg(role, content):
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 async def _build_context(prompt: str, max_hist: int = 20):
-    """组装 system prompt 和 messages 列表，不写数据库。"""
-    system = PERSONA
+    """组装 system prompt（分块，支持缓存）和 messages 列表，不写数据库。"""
+    # 静态块：PERSONA + 记忆 → 打缓存标记，命中后这部分减 90% token 费
+    static_text = PERSONA
     try:
         mem_conn = sqlite3.connect('/data/ghost.db')
         mem_rows = mem_conn.execute(
@@ -89,18 +90,33 @@ async def _build_context(prompt: str, max_hist: int = 20):
         mem_conn.close()
         if mem_rows:
             mem_text = "\n".join(f"- {r[0]}" for r in mem_rows)
-            system += f"\n\n【关于muyu的记忆】\n{mem_text}"
+            static_text += f"\n\n【关于muyu的记忆】\n{mem_text}"
     except Exception:
         pass
 
+    system_parts = [
+        {"type": "text", "text": static_text, "cache_control": {"type": "ephemeral"}}
+    ]
+
+    # 动态块：历史摘要（压缩后的早期对话，不缓存）
+    with get_db() as conn:
+        summary_rows = conn.execute(
+            "SELECT content FROM messages WHERE role='summary' ORDER BY id"
+        ).fetchall()
+    if summary_rows:
+        summaries = "\n\n".join(r["content"] for r in summary_rows)
+        system_parts.append({"type": "text", "text": summaries})
+
+    # 动态块：最近活动（变化频繁，不缓存）
     with get_db() as conn:
         act_rows = conn.execute(
             "SELECT app, action, ts FROM activities ORDER BY id DESC LIMIT 10"
         ).fetchall()
     if act_rows:
         lines = "\n".join(f"{r['ts']} · {r['app']} {r['action']}" for r in reversed(act_rows))
-        system += f"\n\n【她最近的手机活动】\n{lines}"
+        system_parts.append({"type": "text", "text": f"【她最近的手机活动】\n{lines}"})
 
+    # messages 只取正常对话（summary 已放入 system，这里只要 user/assistant）
     with get_db() as conn:
         hist_rows = conn.execute(
             "SELECT role, content FROM messages "
@@ -111,28 +127,98 @@ async def _build_context(prompt: str, max_hist: int = 20):
 
     api_msgs = [{"role": r["role"], "content": r["content"]} for r in history]
     api_msgs.append({"role": "user", "content": prompt})
-    return system, api_msgs
+    return system_parts, api_msgs
+
+
+ANTHROPIC_HEADERS = {
+    "x-api-key": "",          # filled at call time
+    "anthropic-version": "2023-06-01",
+    "anthropic-beta": "prompt-caching-2024-07-31",
+    "content-type": "application/json",
+}
 
 
 async def call_ai(prompt, max_hist=20):
     if not API_KEY:
         return "…（未配置 ANTHROPIC_API_KEY）"
-    system, api_msgs = await _build_context(prompt, max_hist)
+    system_parts, api_msgs = await _build_context(prompt, max_hist)
+    headers = {**ANTHROPIC_HEADERS, "x-api-key": API_KEY}
     try:
         async with httpx.AsyncClient(timeout=30) as c:
             r = await c.post(
                 "https://api.anthropic.com/v1/messages",
-                headers={
-                    "x-api-key": API_KEY,
-                    "anthropic-version": "2023-06-01",
-                    "content-type": "application/json",
-                },
-                json={"model": MODEL, "system": system, "messages": api_msgs, "max_tokens": 150},
+                headers=headers,
+                json={"model": MODEL, "system": system_parts, "messages": api_msgs, "max_tokens": 150},
             )
             r.raise_for_status()
             return r.json()["content"][0]["text"].strip()
     except Exception as e:
         return f"error: {str(e)}"
+
+
+COMPRESS_THRESHOLD = 40   # 超过这么多条时压缩
+COMPRESS_KEEP      = 20   # 压缩后保留最新的这么多条
+
+
+async def maybe_compress():
+    """若对话超过阈值，把最老一批压缩成摘要插回 DB。"""
+    with get_db() as conn:
+        total = conn.execute(
+            "SELECT COUNT(*) FROM messages WHERE role IN ('user','assistant')"
+        ).fetchone()[0]
+        if total <= COMPRESS_THRESHOLD:
+            return
+
+        # 取出要压缩的老消息（总数 - 保留数）
+        to_compress = total - COMPRESS_KEEP
+        old_rows = conn.execute(
+            "SELECT id, role, content, ts FROM messages "
+            "WHERE role IN ('user','assistant') ORDER BY id LIMIT ?",
+            (to_compress,),
+        ).fetchall()
+
+    if not old_rows:
+        return
+
+    # 用 AI 摘要
+    convo = "\n".join(f"{r['role']}: {r['content']}" for r in old_rows)
+    summary_prompt = (
+        "请把以下对话内容压缩成一段简洁的中文摘要（不超过300字），"
+        "保留关键情感、事件和信息，忽略重复内容：\n\n" + convo
+    )
+    try:
+        headers = {**ANTHROPIC_HEADERS, "x-api-key": API_KEY}
+        async with httpx.AsyncClient(timeout=60) as c:
+            r = await c.post(
+                "https://api.anthropic.com/v1/messages",
+                headers=headers,
+                json={
+                    "model": MODEL,
+                    "system": "你是一个对话摘要助手，输出简洁中文摘要。",
+                    "messages": [{"role": "user", "content": summary_prompt}],
+                    "max_tokens": 400,
+                },
+            )
+            r.raise_for_status()
+            summary = r.json()["content"][0]["text"].strip()
+    except Exception as e:
+        print(f"[compress] 摘要失败: {e}")
+        return
+
+    # 删掉老消息，插入摘要占位
+    old_ids = [r["id"] for r in old_rows]
+    oldest_ts = old_rows[0]["ts"] if "ts" in old_rows[0].keys() else time.time()
+    with get_db() as conn:
+        conn.execute(
+            f"DELETE FROM messages WHERE id IN ({','.join('?' * len(old_ids))})",
+            old_ids,
+        )
+        conn.execute(
+            "INSERT INTO messages (role, content, ts) VALUES (?, ?, ?)",
+            ("summary", f"【早期对话摘要】\n{summary}", oldest_ts),
+        )
+        conn.commit()
+    print(f"[compress] 压缩 {len(old_ids)} 条 → 摘要")
 
 
 async def send_ntfy(text):
@@ -179,6 +265,7 @@ async def chat(req: Request):
 
     reply = await call_ai(text)
     m = push_msg("assistant", reply)
+    asyncio.create_task(maybe_compress())
     return {"reply": reply, "id": m["id"]}
 
 
@@ -192,8 +279,9 @@ async def chat_stream(req: Request):
 
     last_user_ts = time.time()
     # 先建上下文（此时 user 消息未入库，不会重复）
-    system, api_msgs = await _build_context(text)
+    system_parts, api_msgs = await _build_context(text)
     push_msg("user", text)
+    headers = {**ANTHROPIC_HEADERS, "x-api-key": API_KEY}
 
     async def generate():
         full_text = ""
@@ -202,14 +290,10 @@ async def chat_stream(req: Request):
                 async with c.stream(
                     "POST",
                     "https://api.anthropic.com/v1/messages",
-                    headers={
-                        "x-api-key": API_KEY,
-                        "anthropic-version": "2023-06-01",
-                        "content-type": "application/json",
-                    },
+                    headers=headers,
                     json={
                         "model": MODEL,
-                        "system": system,
+                        "system": system_parts,
                         "messages": api_msgs,
                         "max_tokens": 150,
                         "stream": True,
@@ -239,6 +323,7 @@ async def chat_stream(req: Request):
         else:
             m = push_msg("assistant", "…（没有收到回复）")
             yield f"data: {json.dumps({'done': True, 'id': m['id']})}\n\n"
+        asyncio.create_task(maybe_compress())
 
     return StreamingResponse(
         generate(),
@@ -251,7 +336,8 @@ async def chat_stream(req: Request):
 async def get_messages(since: int = 0):
     with get_db() as conn:
         rows = conn.execute(
-            "SELECT id, role, content, ts FROM messages WHERE id > ? ORDER BY id",
+            "SELECT id, role, content, ts FROM messages "
+            "WHERE id > ? AND role IN ('user','assistant') ORDER BY id",
             (since,),
         ).fetchall()
         latest_row = conn.execute("SELECT MAX(id) as mx FROM messages").fetchone()
