@@ -3,7 +3,7 @@
 
 import asyncio, json, os, sqlite3, sys, time
 import httpx, uvicorn
-from datetime import datetime
+from datetime import datetime, date as _date
 from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -82,6 +82,13 @@ def init_db():
                 ts   REAL NOT NULL
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS countdowns (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                name        TEXT NOT NULL,
+                target_date TEXT NOT NULL
+            )
+        """)
         conn.commit()
 
 
@@ -125,6 +132,26 @@ async def _build_context(prompt: str, max_hist: int = 20):
     if summary_rows:
         summaries = "\n\n".join(r["content"] for r in summary_rows)
         system_parts.append({"type": "text", "text": summaries})
+
+    # 动态块：倒计时
+    with get_db() as conn:
+        cd_rows = conn.execute(
+            "SELECT name, target_date FROM countdowns ORDER BY target_date"
+        ).fetchall()
+    if cd_rows:
+        cst_today = _date.fromisoformat(
+            time.strftime("%Y-%m-%d", time.gmtime(time.time() + 8 * 3600))
+        )
+        cd_lines = []
+        for r in cd_rows:
+            delta = (_date.fromisoformat(r["target_date"]) - cst_today).days
+            if delta > 0:
+                cd_lines.append(f"- {r['name']}：还有 {delta} 天")
+            elif delta == 0:
+                cd_lines.append(f"- {r['name']}：就是今天！")
+            else:
+                cd_lines.append(f"- {r['name']}：已过 {-delta} 天")
+        system_parts.append({"type": "text", "text": "【重要日期倒计时】\n" + "\n".join(cd_lines)})
 
     # 动态块：最近活动（变化频繁，不缓存）
     with get_db() as conn:
@@ -312,6 +339,47 @@ async def checkin(req: Request):
     )
     m = push_msg("assistant", reply)
     return {"reply": reply, "id": m["id"]}
+
+
+@app.get("/countdowns")
+async def list_countdowns():
+    cst_today = _date.fromisoformat(
+        time.strftime("%Y-%m-%d", time.gmtime(time.time() + 8 * 3600))
+    )
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT id, name, target_date FROM countdowns ORDER BY target_date"
+        ).fetchall()
+    result = []
+    for r in rows:
+        delta = (_date.fromisoformat(r["target_date"]) - cst_today).days
+        result.append({"id": r["id"], "name": r["name"],
+                       "target_date": r["target_date"], "days": delta})
+    return {"countdowns": result}
+
+
+@app.post("/countdown")
+async def add_countdown(req: Request):
+    data = await req.json()
+    name = data.get("name", "").strip()
+    target_date = data.get("target_date", "").strip()
+    if not name or not target_date:
+        return JSONResponse({"error": "missing fields"}, status_code=400)
+    with get_db() as conn:
+        cur = conn.execute(
+            "INSERT INTO countdowns (name, target_date) VALUES (?, ?)",
+            (name, target_date),
+        )
+        conn.commit()
+    return {"id": cur.lastrowid, "name": name, "target_date": target_date}
+
+
+@app.delete("/countdown/{cd_id}")
+async def del_countdown(cd_id: int):
+    with get_db() as conn:
+        conn.execute("DELETE FROM countdowns WHERE id = ?", (cd_id,))
+        conn.commit()
+    return {"ok": True}
 
 
 @app.post("/activity")
