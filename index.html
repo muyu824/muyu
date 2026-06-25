@@ -932,6 +932,47 @@
     }
     .cp-apply:active { opacity: .65; }
 
+    /* ── voice bar ── */
+    .voice-bar {
+      display: flex; align-items: center; gap: 6px;
+      padding: 7px 10px; border-radius: 16px; border-bottom-left-radius: 5px;
+      background: var(--ghost-bubble); border: 1px solid var(--border);
+      cursor: pointer; min-width: 90px; max-width: 160px;
+      -webkit-tap-highlight-color: transparent; user-select: none;
+    }
+    .voice-play-btn {
+      width: 26px; height: 26px; border-radius: 50%;
+      border: none; background: var(--purple); color: #fff;
+      font-size: 9px; cursor: pointer; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      padding: 0; line-height: 1;
+    }
+    .voice-waves {
+      flex: 1; display: flex; align-items: center; gap: 2px; height: 18px;
+    }
+    .voice-waves span {
+      display: inline-block; width: 3px; border-radius: 2px;
+      background: var(--dim); flex-shrink: 0;
+    }
+    .voice-waves span:nth-child(1) { height: 7px; }
+    .voice-waves span:nth-child(2) { height: 13px; }
+    .voice-waves span:nth-child(3) { height: 9px; }
+    .voice-waves span:nth-child(4) { height: 5px; }
+    .voice-waves span:nth-child(5) { height: 11px; }
+    .voice-bar.playing .voice-waves span {
+      background: var(--purple2);
+      animation: vwave .7s ease-in-out infinite alternate;
+    }
+    .voice-waves span:nth-child(2) { animation-delay: .12s; }
+    .voice-waves span:nth-child(3) { animation-delay: .24s; }
+    .voice-waves span:nth-child(4) { animation-delay: .1s; }
+    .voice-waves span:nth-child(5) { animation-delay: .18s; }
+    @keyframes vwave {
+      from { transform: scaleY(.4); }
+      to   { transform: scaleY(1.4); }
+    }
+    .voice-dur { font-size: 11px; color: var(--dim); flex-shrink: 0; }
+
     /* ── traces overlay ── */
     #trace-overlay {
       display: none; position: fixed; inset: 0;
@@ -1366,7 +1407,7 @@
     <button id="sticker-btn" onclick="toggleStickers()" title="贴纸">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
     </button>
-    <button id="mic-btn" onclick="toggleMic()" style="display:none" title="语音">录</button>
+    <button id="mic-btn" style="display:none" title="按住说话">录</button>
     <textarea id="inp" placeholder="说点什么…" rows="1"></textarea>
     <button id="img-btn" onclick="document.getElementById('img-input').click()" title="图片">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
@@ -1616,7 +1657,11 @@ async function doSend() {
       }
     }
 
-    if (fullText) { fullText = fullText.replace(/\n{2,}/g, '\n'); attachLongPress(bubbleEl, fullText.trim()) }
+    if (fullText) {
+      fullText = fullText.replace(/\n{2,}/g, '\n')
+      attachLongPress(bubbleEl, fullText.trim())
+      addTtsBar(fullText.trim(), wrapEl)
+    }
     statusEl.textContent = '在附近游荡…'
   } catch (e) {
     showTyping(false)
@@ -2448,7 +2493,11 @@ async function sendImageSticker(src) {
         } catch (_) {}
       }
     }
-    if (fullText) { fullText = fullText.replace(/\n{2,}/g, '\n'); attachLongPress(bubbleEl, fullText.trim()) }
+    if (fullText) {
+      fullText = fullText.replace(/\n{2,}/g, '\n')
+      attachLongPress(bubbleEl, fullText.trim())
+      addTtsBar(fullText.trim(), wrapEl)
+    }
     statusEl.textContent = '在附近游荡…'
   } catch (_) {
     showTyping(false)
@@ -2519,7 +2568,11 @@ async function sendSticker(emoji) {
         } catch (_) {}
       }
     }
-    if (fullText) { fullText = fullText.replace(/\n{2,}/g, '\n'); attachLongPress(bubbleEl, fullText.trim()) }
+    if (fullText) {
+      fullText = fullText.replace(/\n{2,}/g, '\n')
+      attachLongPress(bubbleEl, fullText.trim())
+      addTtsBar(fullText.trim(), wrapEl)
+    }
     statusEl.textContent = '在附近游荡…'
   } catch (_) {
     showTyping(false)
@@ -2824,66 +2877,173 @@ async function submitCheckin() {
 
 initCheckin()
 
-// ── voice input ───────────────────────────────────────────────────────────────
-let recog = null
-let micListening = false
-let micAborted = false
+// ── voice input (hold-to-record → ElevenLabs STT) ────────────────────────────
+let mediaRec = null
+let audioChunks = []
+let micStream = null
+let isRecording = false
 
 ;(function initMic() {
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition
-  if (!SR) return
+  if (!navigator.mediaDevices || !window.MediaRecorder) return
   const btn = document.getElementById('mic-btn')
   btn.style.display = ''
 
-  recog = new SR()
-  recog.lang = 'zh-CN'
-  recog.continuous = false
-  recog.interimResults = true
-
-  recog.onresult = e => {
-    const text = Array.from(e.results).map(r => r[0].transcript).join('')
-    inp.value = text
-    autoResize(inp)
+  const startRec = async () => {
+    if (busy || isRecording) return
+    navigator.vibrate && navigator.vibrate(40)
+    try {
+      micStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    } catch (_) { showMemToast('无法访问麦克风'); return }
+    audioChunks = []
+    mediaRec = new MediaRecorder(micStream)
+    mediaRec.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data) }
+    mediaRec.start()
+    isRecording = true
+    btn.classList.add('listening')
+    btn.textContent = '松开'
+    statusEl.textContent = '录音中…'
   }
 
-  recog.onend = () => {
-    micListening = false
+  const stopRec = async () => {
+    if (!isRecording || !mediaRec) return
+    isRecording = false
     btn.classList.remove('listening')
     btn.textContent = '录'
-    statusEl.textContent = '在附近游荡…'
-    if (!micAborted && inp.value.trim()) doSend()
-    micAborted = false
+    statusEl.textContent = '处理中…'
+    await new Promise(res => { mediaRec.onstop = res; mediaRec.stop() })
+    if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null }
+    const blob = new Blob(audioChunks, { type: mediaRec.mimeType || 'audio/webm' })
+    if (blob.size < 1500) { statusEl.textContent = '在附近游荡…'; return }
+    await sendVoiceMessage(blob)
   }
 
-  recog.onerror = () => {
-    micListening = false
-    micAborted = false
-    btn.classList.remove('listening')
-    btn.textContent = '录'
-    statusEl.textContent = '在附近游荡…'
-  }
+  btn.addEventListener('touchstart', e => { e.preventDefault(); startRec() }, { passive: false })
+  btn.addEventListener('touchend',   e => { e.preventDefault(); stopRec()  }, { passive: false })
+  btn.addEventListener('touchcancel',e => { e.preventDefault(); stopRec()  }, { passive: false })
+  btn.addEventListener('mousedown', startRec)
+  btn.addEventListener('mouseup',   stopRec)
+  btn.addEventListener('mouseleave', () => { if (isRecording) stopRec() })
 })()
 
-function toggleMic() {
-  if (!recog) { alert('当前浏览器不支持语音输入'); return }
-  const btn = document.getElementById('mic-btn')
-  if (micListening) {
-    micAborted = true
-    micListening = false
-    btn.classList.remove('listening')
-    btn.textContent = '录'
+async function sendVoiceMessage(blob) {
+  busy = true
+  statusEl.textContent = '识别中…'
+  const form = new FormData()
+  form.append('audio', blob, 'rec.webm')
+  try {
+    const r = await fetch('/api/stt', { method: 'POST', body: form })
+    if (!r.ok) throw new Error('stt ' + r.status)
+    showTyping(false)
+    let userShown = false
+    const wrapEl = document.createElement('div')
+    wrapEl.className = 'row ghost'
+    wrapEl.innerHTML = rowAvaHtml() +
+      '<div class="col"><div class="bubble"></div><div class="ts">刚刚</div></div>'
+    const bubbleEl = wrapEl.querySelector('.bubble')
+    const reader = r.body.getReader()
+    const decoder = new TextDecoder()
+    let buf = '', fullText = ''
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buf += decoder.decode(value, { stream: true })
+      const lines = buf.split('\n'); buf = lines.pop()
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue
+        try {
+          const ev = JSON.parse(line.slice(6))
+          if (ev.transcript && !userShown) {
+            addBubble('user', ev.transcript, Date.now() / 1000, null)
+            userShown = true
+            statusEl.textContent = '正在回应…'
+            msgsEl.appendChild(wrapEl)
+            msgsEl.scrollTop = msgsEl.scrollHeight
+          }
+          if (ev.t) {
+            fullText += ev.t
+            bubbleEl.textContent = fullText.replace(/\n{2,}/g, '\n')
+            msgsEl.scrollTop = msgsEl.scrollHeight
+          }
+          if (ev.done && ev.id) {
+            wrapEl.dataset.id = String(ev.id)
+            if (ev.id > latestId) latestId = ev.id
+          }
+        } catch (_) {}
+      }
+    }
+    if (fullText) {
+      fullText = fullText.replace(/\n{2,}/g, '\n')
+      attachLongPress(bubbleEl, fullText.trim())
+      addTtsBar(fullText.trim(), wrapEl)
+    }
     statusEl.textContent = '在附近游荡…'
-    inp.value = ''
-    recog.abort()
-  } else {
-    micAborted = false
-    inp.value = ''
-    try { recog.start() } catch (_) { return }
-    micListening = true
-    btn.classList.add('listening')
-    btn.textContent = '停'
-    statusEl.textContent = '正在听…'
+  } catch (_) {
+    showMemToast('语音识别失败，请重试')
+    statusEl.textContent = '在附近游荡…'
   }
+  busy = false
+}
+
+// ── TTS voice bar ─────────────────────────────────────────────────────────────
+let _ttsAudio = null
+let _ttsBar   = null
+
+function playVoiceBar(barEl) {
+  if (_ttsAudio && _ttsBar === barEl) {
+    if (_ttsAudio.paused) {
+      _ttsAudio.play()
+      barEl.classList.add('playing')
+      barEl.querySelector('.voice-play-btn').textContent = '■'
+    } else {
+      _ttsAudio.pause()
+      barEl.classList.remove('playing')
+      barEl.querySelector('.voice-play-btn').textContent = '▶'
+    }
+    return
+  }
+  if (_ttsAudio) {
+    _ttsAudio.pause()
+    if (_ttsBar) { _ttsBar.classList.remove('playing'); _ttsBar.querySelector('.voice-play-btn').textContent = '▶' }
+  }
+  const url = barEl.dataset.audioUrl
+  if (!url) return
+  const audio = new Audio(url)
+  _ttsAudio = audio; _ttsBar = barEl
+  barEl.classList.add('playing')
+  barEl.querySelector('.voice-play-btn').textContent = '■'
+  audio.play()
+  audio.onended = () => {
+    barEl.classList.remove('playing')
+    barEl.querySelector('.voice-play-btn').textContent = '▶'
+    _ttsAudio = null; _ttsBar = null
+  }
+}
+
+async function addTtsBar(text, wrapEl) {
+  if (!text || text.length > 300 || isSticker(text)) return
+  try {
+    const r = await fetch('/api/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    })
+    if (!r.ok) return
+    const blob = await r.blob()
+    const url = URL.createObjectURL(blob)
+    const col = wrapEl.querySelector('.col')
+    if (!col) return
+    const dur = Math.max(1, Math.round(text.length / 7))
+    const bar = document.createElement('div')
+    bar.className = 'voice-bar'
+    bar.dataset.audioUrl = url
+    bar.innerHTML =
+      '<button class="voice-play-btn">▶</button>' +
+      '<div class="voice-waves"><span></span><span></span><span></span><span></span><span></span></div>' +
+      `<span class="voice-dur">${dur}"</span>`
+    bar.onclick = () => playVoiceBar(bar)
+    const tsEl = col.querySelector('.ts')
+    col.insertBefore(bar, tsEl)
+  } catch (_) {}
 }
 
 // preload nickname field

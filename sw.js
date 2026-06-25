@@ -1,5 +1,5 @@
-const CACHE = 'ghost-v6'
-const API = ['/chat', '/chat/stream', '/messages', '/activity', '/push', '/traces', '/books']
+const CACHE = 'ghost-v7'
+const API = ['/chat', '/chat/stream', '/messages', '/activity', '/push', '/traces', '/books', '/api/']
 
 self.addEventListener('install', () => self.skipWaiting())
 

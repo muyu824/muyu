@@ -5,7 +5,7 @@ import asyncio, json, os, sqlite3, sys, time
 import httpx, uvicorn
 from datetime import datetime, date as _date
 from pathlib import Path
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, File, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 
@@ -18,7 +18,9 @@ app.add_middleware(
 )
 
 # ── config ────────────────────────────────────────────────────────────────────
-API_KEY  = os.environ.get("ANTHROPIC_API_KEY", "")
+API_KEY          = os.environ.get("ANTHROPIC_API_KEY", "")
+ELEVENLABS_KEY   = os.environ.get("ELEVENLABS_API_KEY", "")
+ELEVENLABS_VOICE = "jKvCjWlfWw9gjsSqCU6T"
 NTFY_URL = "https://ntfy.sh/claude-muyu-lovestory-624"
 MODEL    = "claude-sonnet-4-6"
 BASE_DIR = Path(__file__).parent
@@ -1039,6 +1041,108 @@ async def delete_book(book_id: int):
         conn.execute("DELETE FROM books WHERE id=?", (book_id,))
         conn.commit()
     return {"ok": True}
+
+
+@app.post("/api/tts")
+async def api_tts(req: Request):
+    body = await req.json()
+    text = (body.get("text") or "").strip()[:500]
+    if not text:
+        return JSONResponse({"error": "empty"}, status_code=400)
+    if not ELEVENLABS_KEY:
+        return JSONResponse({"error": "ELEVENLABS_API_KEY not set"}, status_code=503)
+    try:
+        async with httpx.AsyncClient(timeout=30) as c:
+            r = await c.post(
+                f"https://api.elevenlabs.io/v1/text-to-speech/{ELEVENLABS_VOICE}",
+                headers={"xi-api-key": ELEVENLABS_KEY, "Content-Type": "application/json"},
+                json={
+                    "text": text,
+                    "model_id": "eleven_multilingual_v2",
+                    "voice_settings": {"stability": 0.5, "similarity_boost": 0.75},
+                },
+            )
+            r.raise_for_status()
+    except httpx.HTTPStatusError as e:
+        return JSONResponse({"error": str(e)}, status_code=502)
+    from fastapi.responses import Response as RawResponse
+    return RawResponse(content=r.content, media_type="audio/mpeg",
+                       headers={"Cache-Control": "no-store"})
+
+
+@app.post("/api/stt")
+async def api_stt(audio: UploadFile = File(...)):
+    global last_user_ts
+    if not ELEVENLABS_KEY:
+        return JSONResponse({"error": "ELEVENLABS_API_KEY not set"}, status_code=503)
+    audio_bytes = await audio.read()
+    mime  = audio.content_type or "audio/webm"
+    fname = audio.filename or "rec.webm"
+    try:
+        async with httpx.AsyncClient(timeout=30) as c:
+            r = await c.post(
+                "https://api.elevenlabs.io/v1/speech-to-text",
+                headers={"xi-api-key": ELEVENLABS_KEY},
+                files={"file": (fname, audio_bytes, mime)},
+                data={"model_id": "scribe_v1"},
+            )
+            r.raise_for_status()
+            transcript = r.json().get("text", "").strip()
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=502)
+    if not transcript:
+        return JSONResponse({"error": "empty transcript"}, status_code=422)
+
+    last_user_ts = time.time()
+    push_msg("user", transcript)
+    system_parts, api_msgs = await _build_context(transcript)
+    headers_ai = {**ANTHROPIC_HEADERS, "x-api-key": API_KEY}
+
+    async def generate():
+        yield f"data: {json.dumps({'transcript': transcript}, ensure_ascii=False)}\n\n"
+        full_text = ""
+        try:
+            async with httpx.AsyncClient(timeout=60) as c:
+                async with c.stream(
+                    "POST",
+                    "https://api.anthropic.com/v1/messages",
+                    headers=headers_ai,
+                    json={
+                        "model": MODEL,
+                        "system": system_parts,
+                        "messages": api_msgs,
+                        "max_tokens": 150,
+                        "stream": True,
+                    },
+                ) as resp:
+                    async for line in resp.aiter_lines():
+                        if not line.startswith("data: "):
+                            continue
+                        data = line[6:]
+                        if data == "[DONE]":
+                            break
+                        try:
+                            ev = json.loads(data)
+                            if ev.get("type") == "content_block_delta":
+                                chunk = ev.get("delta", {}).get("text", "")
+                                if chunk:
+                                    full_text += chunk
+                                    yield f"data: {json.dumps({'t': chunk}, ensure_ascii=False)}\n\n"
+                        except (json.JSONDecodeError, KeyError):
+                            pass
+        except Exception as e:
+            yield f"data: {json.dumps({'e': str(e)})}\n\n"
+        if full_text:
+            m = push_msg("assistant", full_text.strip())
+            yield f"data: {json.dumps({'done': True, 'id': m['id']})}\n\n"
+            asyncio.create_task(extract_trace(full_text.strip()))
+        asyncio.create_task(maybe_compress())
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
+    )
 
 
 @app.on_event("startup")
