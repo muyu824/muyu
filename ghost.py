@@ -20,7 +20,7 @@ app.add_middleware(
 # ── config ────────────────────────────────────────────────────────────────────
 API_KEY  = os.environ.get("OPENROUTER_API_KEY", "")
 NTFY_URL = "https://ntfy.sh/claude-muyu-lovestory-624"
-MODEL    = "anthropic/claude-sonnet-4-5"
+MODEL    = "anthropic/claude-sonnet-4-5:beta"
 BASE_DIR = Path(__file__).parent
 DB_PATH  = Path("/data/ghost.db")
 
@@ -127,7 +127,7 @@ async def call_ai(prompt, max_hist=20):
             r = await c.post(
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers={"Authorization": f"Bearer {API_KEY}", "X-Title": "ghost"},
-                json={"model": MODEL, "messages": api_msgs, "max_tokens": 150},
+                json={"model": MODEL, "messages": api_msgs, "max_tokens": 150, "provider": {"order": ["Amazon Bedrock"], "allow_fallbacks": False}},
             )
             r.raise_for_status()
             return r.json()["choices"][0]["message"]["content"].strip()
