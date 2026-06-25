@@ -730,10 +730,7 @@ async def chat(req: Request):
 async def chat_stream(req: Request):
     global last_user_ts
     body = await req.json()
-    text = body.get("message", "").strip()
-    if not text:
-        return JSONResponse({"error": "empty"}, status_code=400)
-
+    text  = body.get("message", "").strip()
     image = body.get("image")   # {"data": base64str, "type": "image/jpeg"}
     if not text and not image:
         return JSONResponse({"error": "empty"}, status_code=400)

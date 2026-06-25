@@ -1285,6 +1285,7 @@ async function doSend() {
       }
     }
 
+    if (fullText) attachLongPress(bubbleEl, fullText.trim())
     statusEl.textContent = '在附近游荡…'
   } catch (e) {
     showTyping(false)
@@ -1295,10 +1296,11 @@ async function doSend() {
 }
 
 // ── textarea auto-resize ──────────────────────────────────────────────────────
-inp.addEventListener('input', () => {
-  inp.style.height = 'auto'
-  inp.style.height = Math.min(inp.scrollHeight, 96) + 'px'
-})
+function autoResize(el) {
+  el.style.height = 'auto'
+  el.style.height = Math.min(el.scrollHeight, 96) + 'px'
+}
+inp.addEventListener('input', () => autoResize(inp))
 inp.addEventListener('keydown', e => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doSend() }
 })
@@ -1941,6 +1943,7 @@ async function sendSticker(emoji) {
         } catch (_) {}
       }
     }
+    if (fullText) attachLongPress(bubbleEl, fullText.trim())
     statusEl.textContent = '在附近游荡…'
   } catch (_) {
     showTyping(false)
