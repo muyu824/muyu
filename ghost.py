@@ -1091,8 +1091,10 @@ async def api_stt(audio: UploadFile = File(...)):
     if not ELEVENLABS_KEY:
         return JSONResponse({"error": "ELEVENLABS_API_KEY not set"}, status_code=503)
     audio_bytes = await audio.read()
-    mime  = audio.content_type or "audio/webm"
+    # Strip codec params — ElevenLabs only wants base type (audio/webm not audio/webm;codecs=opus)
+    mime  = (audio.content_type or "audio/webm").split(";")[0].strip()
     fname = audio.filename or "rec.webm"
+    print(f"[STT] 收到音频: {fname}, {len(audio_bytes)} bytes, mime={mime}", flush=True)
     try:
         async with httpx.AsyncClient(timeout=30) as c:
             r = await c.post(
@@ -1101,10 +1103,13 @@ async def api_stt(audio: UploadFile = File(...)):
                 files={"file": (fname, audio_bytes, mime)},
                 data={"model_id": "scribe_v1"},
             )
+            print(f"[STT] ElevenLabs 响应: {r.status_code} {r.text[:200]}", flush=True)
             r.raise_for_status()
             transcript = r.json().get("text", "").strip()
     except Exception as e:
+        print(f"[STT] 出错: {e}", flush=True)
         return JSONResponse({"error": str(e)}, status_code=502)
+    print(f"[STT] transcript: {transcript[:100]}", flush=True)
     if not transcript:
         return JSONResponse({"error": "empty transcript"}, status_code=422)
 

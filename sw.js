@@ -1,4 +1,4 @@
-const CACHE = 'ghost-v7'
+const CACHE = 'ghost-v8'
 const API = ['/chat', '/chat/stream', '/messages', '/activity', '/push', '/traces', '/books', '/api/']
 
 self.addEventListener('install', () => self.skipWaiting())
