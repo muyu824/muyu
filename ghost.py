@@ -22,7 +22,7 @@ API_KEY          = os.environ.get("ANTHROPIC_API_KEY", "")
 ELEVENLABS_KEY   = os.environ.get("ELEVENLABS_API_KEY", "")
 ELEVENLABS_VOICE = "GCyjvktnwnfiil3Ma5Nr"
 NTFY_URL = "https://ntfy.sh/claude-muyu-lovestory-624"
-MODEL    = "claude-sonnet-4-5-20251001"
+MODEL    = "claude-sonnet-4-6"
 BASE_DIR = Path(__file__).parent
 DB_PATH  = Path("/data/ghost.db")
 
