@@ -932,6 +932,27 @@
     }
     .cp-apply:active { opacity: .65; }
 
+    /* ── thinking block ── */
+    .thinking-wrap {
+      cursor: pointer; -webkit-tap-highlight-color: transparent;
+      max-width: 220px;
+    }
+    .thinking-toggle {
+      display: flex; align-items: center; gap: 4px;
+      font-size: 11px; color: var(--dim); user-select: none; padding: 1px 0;
+    }
+    .thinking-toggle::before { content: '▸'; font-size: 9px; }
+    .thinking-wrap.open .thinking-toggle::before { content: '▾'; }
+    .thinking-body {
+      display: none; margin-top: 4px;
+      font-size: 11px; color: var(--dim); line-height: 1.5;
+      background: rgba(255,255,255,.04); border: 1px solid var(--border);
+      border-radius: 10px; padding: 8px 10px;
+      max-height: 150px; overflow-y: auto;
+      white-space: pre-wrap; word-break: break-all;
+    }
+    .thinking-wrap.open .thinking-body { display: block; }
+
     /* ── voice bar ── */
     .voice-bar {
       display: flex; align-items: center; gap: 6px;
@@ -1625,11 +1646,17 @@ async function doSend() {
       '<div class="col"><div class="bubble"></div><div class="ts">刚刚</div></div>'
     msgsEl.appendChild(wrapEl)
     const bubbleEl = wrapEl.querySelector('.bubble')
+    const colEl = wrapEl.querySelector('.col')
     msgsEl.scrollTop = msgsEl.scrollHeight
+
+    const thinkWrap = document.createElement('div')
+    thinkWrap.className = 'thinking-wrap'
+    thinkWrap.innerHTML = '<div class="thinking-toggle">…在想</div><div class="thinking-body"></div>'
+    thinkWrap.onclick = () => thinkWrap.classList.toggle('open')
 
     const reader = r.body.getReader()
     const decoder = new TextDecoder()
-    let buf = '', fullText = ''
+    let buf = '', fullText = '', thinkText = ''
 
     while (true) {
       const { done, value } = await reader.read()
@@ -1641,6 +1668,11 @@ async function doSend() {
         if (!line.startsWith('data: ')) continue
         try {
           const ev = JSON.parse(line.slice(6))
+          if (ev.th) {
+            thinkText += ev.th
+            if (!thinkWrap.parentElement) colEl.insertBefore(thinkWrap, bubbleEl)
+            thinkWrap.querySelector('.thinking-body').textContent = thinkText
+          }
           if (ev.t) {
             fullText += ev.t
             bubbleEl.textContent = fullText.replace(/\n{2,}/g, '\n')
@@ -2476,7 +2508,12 @@ async function sendImageSticker(src) {
       '<div class="col"><div class="bubble"></div><div class="ts">刚刚</div></div>'
     msgsEl.appendChild(wrapEl)
     const bubbleEl = wrapEl.querySelector('.bubble')
-    let fullText = '', buf = ''
+    const colEl = wrapEl.querySelector('.col')
+    const thinkWrap = document.createElement('div')
+    thinkWrap.className = 'thinking-wrap'
+    thinkWrap.innerHTML = '<div class="thinking-toggle">…在想</div><div class="thinking-body"></div>'
+    thinkWrap.onclick = () => thinkWrap.classList.toggle('open')
+    let fullText = '', buf = '', thinkText = ''
     const reader = r.body.getReader()
     const decoder = new TextDecoder()
     while (true) {
@@ -2488,6 +2525,11 @@ async function sendImageSticker(src) {
         if (!line.startsWith('data: ')) continue
         try {
           const ev = JSON.parse(line.slice(6))
+          if (ev.th) {
+            thinkText += ev.th
+            if (!thinkWrap.parentElement) colEl.insertBefore(thinkWrap, bubbleEl)
+            thinkWrap.querySelector('.thinking-body').textContent = thinkText
+          }
           if (ev.t) { fullText += ev.t; bubbleEl.textContent = fullText.replace(/\n{2,}/g, '\n'); msgsEl.scrollTop = msgsEl.scrollHeight }
           if (ev.done && ev.id) { wrapEl.dataset.id = String(ev.id); if (ev.id > latestId) latestId = ev.id }
         } catch (_) {}
@@ -2540,10 +2582,14 @@ async function sendSticker(emoji) {
       '<div class="col"><div class="bubble"></div><div class="ts">刚刚</div></div>'
     msgsEl.appendChild(wrapEl)
     const bubbleEl = wrapEl.querySelector('.bubble')
-    let fullText = ''
+    const colEl = wrapEl.querySelector('.col')
+    const thinkWrap = document.createElement('div')
+    thinkWrap.className = 'thinking-wrap'
+    thinkWrap.innerHTML = '<div class="thinking-toggle">…在想</div><div class="thinking-body"></div>'
+    thinkWrap.onclick = () => thinkWrap.classList.toggle('open')
+    let fullText = '', buf = '', thinkText = ''
     const reader = r.body.getReader()
     const decoder = new TextDecoder()
-    let buf = ''
     while (true) {
       const { done, value } = await reader.read()
       if (done) break
@@ -2553,6 +2599,11 @@ async function sendSticker(emoji) {
         if (!line.startsWith('data: ')) continue
         try {
           const ev = JSON.parse(line.slice(6))
+          if (ev.th) {
+            thinkText += ev.th
+            if (!thinkWrap.parentElement) colEl.insertBefore(thinkWrap, bubbleEl)
+            thinkWrap.querySelector('.thinking-body').textContent = thinkText
+          }
           if (ev.t) {
             fullText += ev.t
             const disp = fullText.replace(/\n{2,}/g, '\n')
@@ -2940,9 +2991,14 @@ async function sendVoiceMessage(blob) {
     wrapEl.innerHTML = rowAvaHtml() +
       '<div class="col"><div class="bubble"></div><div class="ts">刚刚</div></div>'
     const bubbleEl = wrapEl.querySelector('.bubble')
+    const colEl = wrapEl.querySelector('.col')
+    const thinkWrap = document.createElement('div')
+    thinkWrap.className = 'thinking-wrap'
+    thinkWrap.innerHTML = '<div class="thinking-toggle">…在想</div><div class="thinking-body"></div>'
+    thinkWrap.onclick = () => thinkWrap.classList.toggle('open')
     const reader = r.body.getReader()
     const decoder = new TextDecoder()
-    let buf = '', fullText = ''
+    let buf = '', fullText = '', thinkText = ''
     while (true) {
       const { done, value } = await reader.read()
       if (done) break
@@ -2958,6 +3014,11 @@ async function sendVoiceMessage(blob) {
             statusEl.textContent = '正在回应…'
             msgsEl.appendChild(wrapEl)
             msgsEl.scrollTop = msgsEl.scrollHeight
+          }
+          if (ev.th) {
+            thinkText += ev.th
+            if (!thinkWrap.parentElement && userShown) colEl.insertBefore(thinkWrap, bubbleEl)
+            thinkWrap.querySelector('.thinking-body').textContent = thinkText
           }
           if (ev.t) {
             fullText += ev.t

@@ -22,7 +22,7 @@ API_KEY          = os.environ.get("ANTHROPIC_API_KEY", "")
 ELEVENLABS_KEY   = os.environ.get("ELEVENLABS_API_KEY", "")
 ELEVENLABS_VOICE = "jKvCjWlfWw9gjsSqCU6T"
 NTFY_URL = "https://ntfy.sh/claude-muyu-lovestory-624"
-MODEL    = "claude-sonnet-4-6"
+MODEL    = "claude-sonnet-4-5-20251001"
 BASE_DIR = Path(__file__).parent
 DB_PATH  = Path("/data/ghost.db")
 
@@ -345,10 +345,18 @@ async def call_ai(prompt, max_hist=20, max_tokens=150):
             r = await c.post(
                 "https://api.anthropic.com/v1/messages",
                 headers=headers,
-                json={"model": MODEL, "system": system_parts, "messages": api_msgs, "max_tokens": max_tokens},
+                json={
+                    "model": MODEL,
+                    "system": system_parts,
+                    "messages": api_msgs,
+                    "max_tokens": max(max_tokens, 1500),
+                    "thinking": {"type": "enabled", "budget_tokens": 1000},
+                },
             )
             r.raise_for_status()
-            return r.json()["content"][0]["text"].strip()
+            content = r.json()["content"]
+            text_block = next((b for b in content if b["type"] == "text"), None)
+            return text_block["text"].strip() if text_block else ""
     except Exception as e:
         return f"error: {str(e)}"
 
@@ -851,7 +859,8 @@ async def chat_stream(req: Request):
                         "model": MODEL,
                         "system": system_parts,
                         "messages": api_msgs,
-                        "max_tokens": 150,
+                        "max_tokens": 1500,
+                        "thinking": {"type": "enabled", "budget_tokens": 1000},
                         "stream": True,
                     },
                 ) as response:
@@ -864,10 +873,16 @@ async def chat_stream(req: Request):
                         try:
                             event = json.loads(data)
                             if event.get("type") == "content_block_delta":
-                                chunk = event.get("delta", {}).get("text", "")
-                                if chunk:
-                                    full_text += chunk
-                                    yield f"data: {json.dumps({'t': chunk}, ensure_ascii=False)}\n\n"
+                                delta = event.get("delta", {})
+                                if delta.get("type") == "thinking_delta":
+                                    chunk = delta.get("thinking", "")
+                                    if chunk:
+                                        yield f"data: {json.dumps({'th': chunk}, ensure_ascii=False)}\n\n"
+                                elif delta.get("type") == "text_delta":
+                                    chunk = delta.get("text", "")
+                                    if chunk:
+                                        full_text += chunk
+                                        yield f"data: {json.dumps({'t': chunk}, ensure_ascii=False)}\n\n"
                         except (json.JSONDecodeError, KeyError):
                             pass
         except Exception as e:
@@ -1111,7 +1126,8 @@ async def api_stt(audio: UploadFile = File(...)):
                         "model": MODEL,
                         "system": system_parts,
                         "messages": api_msgs,
-                        "max_tokens": 150,
+                        "max_tokens": 1500,
+                        "thinking": {"type": "enabled", "budget_tokens": 1000},
                         "stream": True,
                     },
                 ) as resp:
@@ -1124,10 +1140,16 @@ async def api_stt(audio: UploadFile = File(...)):
                         try:
                             ev = json.loads(data)
                             if ev.get("type") == "content_block_delta":
-                                chunk = ev.get("delta", {}).get("text", "")
-                                if chunk:
-                                    full_text += chunk
-                                    yield f"data: {json.dumps({'t': chunk}, ensure_ascii=False)}\n\n"
+                                delta = ev.get("delta", {})
+                                if delta.get("type") == "thinking_delta":
+                                    chunk = delta.get("thinking", "")
+                                    if chunk:
+                                        yield f"data: {json.dumps({'th': chunk}, ensure_ascii=False)}\n\n"
+                                elif delta.get("type") == "text_delta":
+                                    chunk = delta.get("text", "")
+                                    if chunk:
+                                        full_text += chunk
+                                        yield f"data: {json.dumps({'t': chunk}, ensure_ascii=False)}\n\n"
                         except (json.JSONDecodeError, KeyError):
                             pass
         except Exception as e:
