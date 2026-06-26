@@ -3268,50 +3268,102 @@ let _ttsAudio = null
 let _ttsBar   = null
 
 function playVoiceBar(barEl) {
+  const playBtn = barEl.querySelector('.voice-play-btn')
+  // Toggle same bar
   if (_ttsAudio && _ttsBar === barEl) {
     if (_ttsAudio.paused) {
       _ttsAudio.play()
-      barEl.classList.add('playing')
-      barEl.querySelector('.voice-play-btn').textContent = '■'
+        .then(() => { barEl.classList.add('playing'); playBtn.textContent = '■' })
+        .catch(e => console.error('[TTS] 恢复播放失败:', e))
     } else {
       _ttsAudio.pause()
       barEl.classList.remove('playing')
-      barEl.querySelector('.voice-play-btn').textContent = '▶'
+      playBtn.textContent = '▶'
     }
     return
   }
+  // Stop previous
   if (_ttsAudio) {
     _ttsAudio.pause()
-    if (_ttsBar) { _ttsBar.classList.remove('playing'); _ttsBar.querySelector('.voice-play-btn').textContent = '▶' }
+    if (_ttsBar) {
+      _ttsBar.classList.remove('playing')
+      const pb = _ttsBar.querySelector('.voice-play-btn')
+      if (pb) pb.textContent = '▶'
+    }
+    _ttsAudio = null; _ttsBar = null
   }
   const url = barEl.dataset.audioUrl
-  if (!url) return
+  console.log('[TTS] 开始播放 url:', url ? url.slice(0, 50) + '…' : 'null')
+  if (!url) { console.warn('[TTS] audioUrl 为空，无法播放'); return }
   const audio = new Audio(url)
   _ttsAudio = audio; _ttsBar = barEl
   barEl.classList.add('playing')
-  barEl.querySelector('.voice-play-btn').textContent = '■'
+  playBtn.textContent = '■'
   audio.play()
+    .then(() => console.log('[TTS] 播放中'))
+    .catch(e => {
+      console.error('[TTS] 播放失败:', e)
+      barEl.classList.remove('playing')
+      playBtn.textContent = '▶'
+      _ttsAudio = null; _ttsBar = null
+    })
   audio.onended = () => {
+    console.log('[TTS] 播放结束')
     barEl.classList.remove('playing')
-    barEl.querySelector('.voice-play-btn').textContent = '▶'
+    playBtn.textContent = '▶'
+    _ttsAudio = null; _ttsBar = null
+  }
+  audio.onerror = e => {
+    console.error('[TTS] 音频错误:', e, audio.error)
+    barEl.classList.remove('playing')
+    playBtn.textContent = '▶'
     _ttsAudio = null; _ttsBar = null
   }
 }
 
 async function addTtsBar(text, wrapEl) {
-  if (!text || text.length > 300 || isSticker(text)) return
+  if (!text || isSticker(text)) {
+    console.log('[TTS] 跳过：', text ? '贴纸' : '空文本')
+    return
+  }
+  const trimmed = text.slice(0, 500)  // ElevenLabs accepts up to 500 chars
+  console.log('[TTS] 请求语音，文本长度:', trimmed.length)
   try {
     const r = await fetch('/api/tts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ text: trimmed }),
     })
-    if (!r.ok) return
+    console.log('[TTS] 响应 status:', r.status, 'content-type:', r.headers.get('content-type'))
+    if (!r.ok) {
+      const errText = await r.text().catch(() => '')
+      console.warn('[TTS] 接口失败:', r.status, errText)
+      return
+    }
     const blob = await r.blob()
+    console.log('[TTS] blob 大小:', blob.size, '类型:', blob.type)
+    if (blob.size === 0) { console.warn('[TTS] 收到空 blob'); return }
+
     const url = URL.createObjectURL(blob)
+    console.log('[TTS] ObjectURL 创建成功')
+
     const col = wrapEl.querySelector('.col')
-    if (!col) return
-    const dur = Math.max(1, Math.round(text.length / 7))
+    if (!col) { console.warn('[TTS] 找不到 .col'); return }
+
+    // Read actual duration from audio metadata (fall back to text-length estimate)
+    const dur = await new Promise(resolve => {
+      const probe = new Audio(url)
+      const fallback = Math.max(1, Math.round(trimmed.length / 7))
+      const timer = setTimeout(() => resolve(fallback), 2000)
+      probe.onloadedmetadata = () => {
+        clearTimeout(timer)
+        resolve(isFinite(probe.duration) && probe.duration > 0
+          ? Math.ceil(probe.duration) : fallback)
+      }
+      probe.onerror = () => { clearTimeout(timer); resolve(fallback) }
+    })
+    console.log('[TTS] 时长:', dur, '秒')
+
     const bar = document.createElement('div')
     bar.className = 'voice-bar'
     bar.dataset.audioUrl = url
@@ -3320,9 +3372,14 @@ async function addTtsBar(text, wrapEl) {
       '<div class="voice-waves"><span></span><span></span><span></span><span></span><span></span></div>' +
       `<span class="voice-dur">${dur}"</span>`
     bar.onclick = () => playVoiceBar(bar)
+
     const tsEl = col.querySelector('.ts')
-    col.insertBefore(bar, tsEl)
-  } catch (_) {}
+    if (tsEl) col.insertBefore(bar, tsEl)
+    else col.appendChild(bar)
+    console.log('[TTS] 语音条已插入，parent:', col.className)
+  } catch (e) {
+    console.error('[TTS] 出错:', e)
+  }
 }
 
 // preload nickname field
