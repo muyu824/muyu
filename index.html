@@ -51,9 +51,9 @@
       align-items: center;
       gap: 10px;
       padding: 12px 16px;
-      background: rgba(18,7,32,0.85);
-      backdrop-filter: blur(14px);
-      -webkit-backdrop-filter: blur(14px);
+      background: color-mix(in srgb, var(--bg) 78%, transparent);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
       border-bottom: 1px solid var(--border);
       flex-shrink: 0;
       z-index: 10;
@@ -1127,6 +1127,64 @@
       background: none; color: var(--dim); font-size: 14px; cursor: pointer;
     }
 
+    /* ── chat background settings ── */
+    #bg-settings-overlay {
+      display: none; position: fixed; inset: 0;
+      background: var(--modal-bg);
+      backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+      z-index: 200; align-items: flex-start; justify-content: center;
+      padding-top: max(50px, env(safe-area-inset-top)); overflow-y: auto;
+    }
+    #bg-settings-overlay.show { display: flex; }
+    .bg-card {
+      background: rgba(255,255,255,.05); border: 1px solid var(--border);
+      border-radius: 22px; padding: 24px 20px;
+      width: min(380px, 92vw); margin-bottom: 40px;
+    }
+    .bg-card-head {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 18px;
+    }
+    .bg-card-title { font-size: 15px; font-weight: 600; }
+    .bg-card-close { background: none; border: none; color: var(--dim); font-size: 20px; cursor: pointer; }
+    .bg-section-label { font-size: 12px; color: var(--dim); margin-bottom: 10px; margin-top: 16px; }
+    .bg-section-label:first-of-type { margin-top: 0; }
+    .bg-swatches {
+      display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 4px;
+    }
+    .bg-swatch-wrap {
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+      cursor: pointer; -webkit-tap-highlight-color: transparent;
+    }
+    .bg-swatch {
+      width: 44px; height: 44px; border-radius: 12px;
+      border: 2px solid transparent; transition: border-color .15s;
+    }
+    .bg-swatch-wrap.active .bg-swatch { border-color: var(--purple2); }
+    .bg-swatch-lbl { font-size: 10px; color: var(--dim); }
+    .bg-file-row {
+      display: flex; gap: 10px; align-items: center; margin-top: 4px;
+    }
+    .bg-upload-btn, .bg-clear-btn {
+      flex: 1; padding: 9px 0; border-radius: 20px;
+      font-size: 13px; cursor: pointer; text-align: center;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .bg-upload-btn {
+      background: var(--ghost-bubble); border: 1px solid var(--border);
+      color: var(--text);
+    }
+    .bg-clear-btn {
+      background: none; border: 1px solid var(--border);
+      color: var(--dim);
+    }
+    .bg-upload-btn:active, .bg-clear-btn:active { opacity: .65; }
+    #bg-img-preview {
+      margin-top: 10px; border-radius: 12px; overflow: hidden;
+      max-height: 120px;
+    }
+    #bg-img-preview img { width: 100%; height: 120px; object-fit: cover; display: block; }
+
     /* ── image lightbox ── */
     #lightbox {
       display: none; position: fixed; inset: 0; z-index: 600;
@@ -1293,6 +1351,9 @@
     </div>
     <div class="drawer-item" onclick="closeDrawer();openBooks()">
       <span class="drawer-label">书架</span>
+    </div>
+    <div class="drawer-item" onclick="closeDrawer();openBgSettings()">
+      <span class="drawer-label">聊天背景</span>
     </div>
 
     <div class="drawer-divider"></div>
@@ -1501,6 +1562,27 @@
         <button class="book-del-btn" id="book-del-btn" onclick="confirmDeleteBook()" style="display:none">删除</button>
         <button class="book-cancel-btn" onclick="hideBookForm()">取消</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- bg settings overlay -->
+<div id="bg-settings-overlay">
+  <div class="bg-card">
+    <div class="bg-card-head">
+      <span class="bg-card-title">聊天背景</span>
+      <button class="bg-card-close" onclick="closeBgSettings()">×</button>
+    </div>
+    <div class="bg-section-label">纯色背景</div>
+    <div class="bg-swatches" id="bg-swatches"></div>
+    <div class="bg-section-label">本地图片</div>
+    <input type="file" id="bg-file" accept="image/*" style="display:none" onchange="handleBgFile(this)">
+    <div id="bg-img-preview" style="display:none">
+      <img id="bg-img-thumb" src="" alt="">
+    </div>
+    <div class="bg-file-row">
+      <button class="bg-upload-btn" onclick="document.getElementById('bg-file').click()">选择图片</button>
+      <button class="bg-clear-btn" onclick="applyChatBg('');closeBgSettings()">恢复默认</button>
     </div>
   </div>
 </div>
@@ -2818,6 +2900,117 @@ async function confirmDeleteBook() {
   loadBooks()
 }
 
+// ── chat background ───────────────────────────────────────────────────────────
+const BG_PRESETS = [
+  { label: '默认', value: '' },
+  { label: '静夜', value: '#0d1520' },
+  { label: '深林', value: '#0f1a12' },
+  { label: '暖夜', value: '#1e1408' },
+  { label: '玫影', value: '#1a0a18' },
+  { label: '浅粉', value: '#fdf4f5' },
+  { label: '暖米', value: '#faf5ea' },
+  { label: '晴空', value: '#eaf4fd' },
+  { label: '薄荷', value: '#edfaf4' },
+]
+
+function applyChatBg(value) {
+  const msgs = document.getElementById('msgs')
+  if (!value) {
+    msgs.style.backgroundImage = ''
+    msgs.style.backgroundColor = ''
+    localStorage.removeItem('chat-bg')
+  } else if (value.startsWith('#') || value.startsWith('rgb')) {
+    msgs.style.backgroundColor = value
+    msgs.style.backgroundImage = ''
+    localStorage.setItem('chat-bg', value)
+  } else if (value.startsWith('data:')) {
+    msgs.style.backgroundImage = `url("${value}")`
+    msgs.style.backgroundSize = 'cover'
+    msgs.style.backgroundPosition = 'center'
+    msgs.style.backgroundColor = ''
+    localStorage.setItem('chat-bg', value)
+  }
+  document.querySelectorAll('.bg-swatch-wrap').forEach(w =>
+    w.classList.toggle('active', w.dataset.value === (value || '')))
+}
+
+function loadChatBg() {
+  const saved = localStorage.getItem('chat-bg')
+  if (saved) applyChatBg(saved)
+}
+
+function buildBgSwatches() {
+  const container = document.getElementById('bg-swatches')
+  if (!container) return
+  const current = localStorage.getItem('chat-bg') || ''
+  container.innerHTML = ''
+  BG_PRESETS.forEach(p => {
+    const wrap = document.createElement('div')
+    wrap.className = 'bg-swatch-wrap' + (current === (p.value || '') ? ' active' : '')
+    wrap.dataset.value = p.value || ''
+    const sw = document.createElement('div')
+    sw.className = 'bg-swatch'
+    if (p.value) {
+      sw.style.background = p.value
+    } else {
+      sw.style.background = 'linear-gradient(135deg, var(--bg), var(--bg2))'
+      sw.style.borderStyle = 'dashed'
+      sw.style.borderColor = 'var(--dim)'
+    }
+    const lbl = document.createElement('div')
+    lbl.className = 'bg-swatch-lbl'
+    lbl.textContent = p.label
+    wrap.appendChild(sw)
+    wrap.appendChild(lbl)
+    wrap.onclick = () => applyChatBg(p.value)
+    container.appendChild(wrap)
+  })
+  // Show image preview if bg is an image
+  const saved = localStorage.getItem('chat-bg') || ''
+  const preview = document.getElementById('bg-img-preview')
+  const thumb = document.getElementById('bg-img-thumb')
+  if (saved.startsWith('data:') && preview && thumb) {
+    thumb.src = saved
+    preview.style.display = ''
+  } else if (preview) {
+    preview.style.display = 'none'
+  }
+}
+
+function openBgSettings() {
+  document.getElementById('bg-settings-overlay').classList.add('show')
+  buildBgSwatches()
+}
+
+function closeBgSettings() {
+  document.getElementById('bg-settings-overlay').classList.remove('show')
+}
+
+function handleBgFile(input) {
+  const file = input.files[0]
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = e => {
+    const img = new Image()
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      const MAX = 1080
+      let w = img.width, h = img.height
+      if (w > MAX) { h = Math.round(h * MAX / w); w = MAX }
+      canvas.width = w; canvas.height = h
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h)
+      const data = canvas.toDataURL('image/jpeg', 0.72)
+      applyChatBg(data)
+      const preview = document.getElementById('bg-img-preview')
+      const thumb = document.getElementById('bg-img-thumb')
+      if (preview && thumb) { thumb.src = data; preview.style.display = '' }
+      input.value = ''
+    }
+    img.src = e.target.result
+  }
+  reader.readAsDataURL(file)
+}
+
 // ── countdown ─────────────────────────────────────────────────────────────────
 async function openCd() {
   document.getElementById('cd-overlay').classList.add('show')
@@ -2939,14 +3132,37 @@ let isRecording = false
   const btn = document.getElementById('mic-btn')
   btn.style.display = ''
 
+  // Pick the best format ElevenLabs supports
+  const MIME_PREF = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus', 'audio/ogg']
+  const recMime = MIME_PREF.find(m => MediaRecorder.isTypeSupported(m)) || ''
+  const recExt  = recMime.includes('mp4') ? 'mp4' : recMime.includes('ogg') ? 'ogg' : 'webm'
+
   const startRec = async () => {
     if (busy || isRecording) return
+    // Check permission state before prompting
+    if (navigator.permissions) {
+      try {
+        const perm = await navigator.permissions.query({ name: 'microphone' })
+        if (perm.state === 'denied') {
+          showMemToast('麦克风权限已被禁止，请在系统设置中开启')
+          return
+        }
+        if (perm.state === 'prompt') showMemToast('请允许麦克风权限')
+      } catch (_) {}
+    }
     navigator.vibrate && navigator.vibrate(40)
     try {
       micStream = await navigator.mediaDevices.getUserMedia({ audio: true })
-    } catch (_) { showMemToast('无法访问麦克风'); return }
+    } catch (e) {
+      const msg = (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError')
+        ? '麦克风权限被拒绝，请在设置中开启'
+        : '无法访问麦克风'
+      showMemToast(msg)
+      return
+    }
     audioChunks = []
-    mediaRec = new MediaRecorder(micStream)
+    const opts = recMime ? { mimeType: recMime } : {}
+    mediaRec = new MediaRecorder(micStream, opts)
     mediaRec.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data) }
     mediaRec.start()
     isRecording = true
@@ -2963,9 +3179,11 @@ let isRecording = false
     statusEl.textContent = '处理中…'
     await new Promise(res => { mediaRec.onstop = res; mediaRec.stop() })
     if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null }
-    const blob = new Blob(audioChunks, { type: mediaRec.mimeType || 'audio/webm' })
+    const mimeUsed = mediaRec.mimeType || recMime || 'audio/webm'
+    const ext = mimeUsed.includes('mp4') ? 'mp4' : mimeUsed.includes('ogg') ? 'ogg' : 'webm'
+    const blob = new Blob(audioChunks, { type: mimeUsed })
     if (blob.size < 1500) { statusEl.textContent = '在附近游荡…'; return }
-    await sendVoiceMessage(blob)
+    await sendVoiceMessage(blob, ext)
   }
 
   btn.addEventListener('touchstart', e => { e.preventDefault(); startRec() }, { passive: false })
@@ -2976,11 +3194,11 @@ let isRecording = false
   btn.addEventListener('mouseleave', () => { if (isRecording) stopRec() })
 })()
 
-async function sendVoiceMessage(blob) {
+async function sendVoiceMessage(blob, ext = 'webm') {
   busy = true
   statusEl.textContent = '识别中…'
   const form = new FormData()
-  form.append('audio', blob, 'rec.webm')
+  form.append('audio', blob, `rec.${ext}`)
   try {
     const r = await fetch('/api/stt', { method: 'POST', body: form })
     if (!r.ok) throw new Error('stt ' + r.status)
@@ -3109,6 +3327,7 @@ async function addTtsBar(text, wrapEl) {
 
 // preload nickname field
 loadNickname()
+loadChatBg()
 
 // load streak badge on startup
 ;(async () => {
